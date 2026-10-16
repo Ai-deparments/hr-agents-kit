@@ -40,7 +40,10 @@ def questions_for(v: Vacancy) -> list[str]:
                    "religion, marital status, children, pregnancy, appearance or health (only 'do you have the document').",
             messages=[{"role": "user", "content": f"{v.title}\n{v.schedule_text or ''}\n{v.requirements or ''}"}])
         qs = json.loads(next(b.text for b in r.content if b.type == "text"))["questions"][:5]
-        return qs if len(qs) == 5 else BASE_QUESTIONS
+        from .recruiting import find_banned
+        if len(qs) != 5 or any(find_banned(q) for q in qs):  # never ask about protected attributes
+            return BASE_QUESTIONS
+        return qs
     except Exception:
         log.exception("question generation failed")
         return BASE_QUESTIONS

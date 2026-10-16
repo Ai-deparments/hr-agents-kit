@@ -53,6 +53,15 @@ Hammasi filial bo'yicha ruxsat bilan cheklangan.
 - nomzodlar ballari bilan;
 - tugmalar: Shortlist / Ishga olindi / Rad etish. Qarorni faqat inson qabul qiladi.
 
+**v0.2 da yangi:**
+- **Keldim'ni soxtalashtirishdan himoya.** Filial geozonasi (GPS) yoki mudir telefonidagi har 60 soniyada yangilanadigan QR.
+- **Mehnat kodeksi qoidalari.** 6 oydan oldingi ta'til belgilanadi; yiliga 120 soatdan ortiq qo'shimcha ish ogohlantiriladi.
+- **Qoidalar bilan tanishish.** Xodim SOP'ni «o'qidim» deb tasdiqlaydi; panelda qamrov foizi ko'rinadi.
+- **Anonim eNPS va ishdan ketish so'rovnomasi.** Natija kamida 5 ta javob bo'lsa ko'rsatiladi.
+- **Ketish xavfi signallari.** Faqat HR ko'radi; bu suhbat uchun sabab, qaror emas.
+- **Nomzod roziligi.** Shaxsiy ma'lumotlarga rozilik so'raladi; rad etilganlar ma'lumotlari 180 kundan keyin anonimlashtiriladi.
+- **Xavfsizlik auditi:** [docs/SECURITY.md](docs/SECURITY.md).
+
 ### Qoidalar
 
 - **7 qarorni faqat inson qabul qiladi**: oylikni tasdiqlash, ushlab qolish, shartnomani o'zgartirish, ishga olish, bo'shatish, ommaviy xabar va arizani tasdiqlash.
@@ -139,6 +148,15 @@ Stek va kod qoidalari: [`.claude/skills/default-stack`](.claude/skills/default-s
 **Mini App Rauf (`/m/rauf`)** — открывается в боте Rauf только для HR:
 - кандидаты с баллами;
 - кнопки Shortlist / Ishga olindi / Rad etish. Решение принимает только человек.
+
+**Новое в v0.2:**
+- **Защита «Keldim» от подделки.** Геозона филиала (GPS) или QR, который меняется каждые 60 секунд на телефоне заведующего.
+- **Правила Трудового кодекса.** Отпуск раньше 6 месяцев работы помечается; переработка больше 120 часов в год вызывает предупреждение.
+- **Ознакомление с правилами.** Сотрудник подтверждает «прочитал» для SOP; в панели виден процент охвата.
+- **Анонимный eNPS и exit-опрос.** Итоги показываются, только если ответов не меньше 5.
+- **Сигналы риска увольнения.** Видит только HR; это повод для разговора, а не решение.
+- **Согласие кандидата.** Бот спрашивает согласие на обработку персональных данных; данные отклонённых обезличиваются через 180 дней.
+- **Аудит безопасности:** [docs/SECURITY.md](docs/SECURITY.md).
 
 ### Принципы
 

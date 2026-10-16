@@ -14,6 +14,7 @@ const dict: Record<string, Record<Lang, string>> = {
   documents: { en: "Documents", uz: "Hujjatlar", ru: "Документы" },
   recruiting: { en: "Recruiting", uz: "Nomzodlar", ru: "Подбор" },
   analytics: { en: "Analytics", uz: "Tahlil", ru: "Аналитика" },
+  engagement: { en: "Engagement", uz: "Jalb etilganlik", ru: "Вовлечённость" },
   agents: { en: "Agent chat", uz: "Agent bilan suhbat", ru: "Чат с агентами" },
   knowledge: { en: "Knowledge", uz: "Bilim bazasi", ru: "База знаний" },
   chats: { en: "All chats", uz: "Barcha yozishmalar", ru: "Все переписки" },

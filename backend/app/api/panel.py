@@ -3,9 +3,10 @@ from __future__ import annotations
 
 import csv
 import io
+import time
 from datetime import date, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -26,6 +27,17 @@ def _month(m: str | None) -> str:
     return m or date.today().strftime("%Y-%m")
 
 
+MAX_UPLOAD = 2 * 1024 * 1024
+_ip_fails: dict[str, list[float]] = {}
+
+
+async def _read_upload(file: UploadFile) -> bytes:
+    data = await file.read(MAX_UPLOAD + 1)
+    if len(data) > MAX_UPLOAD:
+        raise HTTPException(413, "File too large (max 2 MB)")
+    return data
+
+
 def _guard(fn, *a, **kw):
     try:
         return fn(*a, **kw)
@@ -43,13 +55,18 @@ class LoginIn(BaseModel):
 
 
 @router.post("/auth/login")
-def login(body: LoginIn, db: Session = Depends(get_db)):
+def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
+    ip = request.client.host if request.client else "?"
+    recent = [t for t in _ip_fails.get(ip, []) if t > time.time() - 600]
+    if len(recent) >= 30:  # password spraying across many usernames from one address
+        raise HTTPException(429, "Too many attempts, try again later")
     user = db.scalar(select(User).where(User.username == body.username))
     if not user or not user.active or not check_password(user, body.password):
+        _ip_fails[ip] = recent + [time.time()]
         raise HTTPException(401, "Wrong login or password")
     audit(db, Scope(f"user:{user.username}", user.role), "login")
     db.commit()
-    return {"token": make_token(str(user.id), "panel", 30)}
+    return {"token": make_token(str(user.id), "panel", 7)}
 
 
 @router.get("/me")
@@ -69,8 +86,8 @@ def public_config():
 def dictionaries(scope: Scope = Depends(panel_scope), db: Session = Depends(get_db)):
     branches = [b for b in db.scalars(select(Branch).order_by(Branch.name)) if scope.allows_branch(b.id)]
     return {"regions": [{"id": r.id, "code": r.code, "name": r.name} for r in db.scalars(select(Region))],
-            "branches": [{"id": b.id, "code": b.code, "name": b.name, "region_id": b.region_id, "city": b.city, "mode": b.mode}
-                         for b in branches],
+            "branches": [{"id": b.id, "code": b.code, "name": b.name, "region_id": b.region_id, "city": b.city, "mode": b.mode,
+                          "lat": b.lat, "lon": b.lon, "radius_m": b.radius_m} for b in branches],
             "positions": [{"id": p.id, "code": p.code, "title": p.title} for p in db.scalars(select(Position))],
             "schedules": list((cfg("schedules") or {}).keys())}
 
@@ -151,6 +168,8 @@ def update_employee(emp_id: int, body: dict, scope: Scope = Depends(require("hr.
         if k in allowed:
             if k == "branch_id" and not scope.allows_branch(v):
                 raise HTTPException(403, "Not your branch")
+            if k == "status" and v not in ("probation", "active"):
+                raise HTTPException(400, "Use the fire endpoint (reason required) to dismiss")
             if k == "hire_date" and v:
                 v = date.fromisoformat(v)
             setattr(e, k, v)
@@ -375,7 +394,7 @@ def payroll_entry_cancel(entry_id: int, body: ReasonIn, scope: Scope = Depends(r
 @router.post("/payroll/sales/import")
 async def sales_import(month: str, file: UploadFile, scope: Scope = Depends(require("payroll.write")), db: Session = Depends(get_db)):
     """CSV: employee_id,amount  (or phone,amount). Sales % bonus is calculated from this."""
-    text = (await file.read()).decode("utf-8-sig")
+    text = (await _read_upload(file)).decode("utf-8-sig")
     ok, missing = 0, []
     for row in csv.DictReader(io.StringIO(text)):
         emp = None
@@ -456,7 +475,7 @@ def onboarding_create(body: OnbIn, scope: Scope = Depends(require("onboarding"))
 
 
 @router.post("/onboarding/items/{item_id}")
-def onboarding_item(item_id: int, done: bool = True, scope: Scope = Depends(require("hr.read")), db: Session = Depends(get_db)):
+def onboarding_item(item_id: int, done: bool = True, scope: Scope = Depends(require("onboarding")), db: Session = Depends(get_db)):
     i = _guard(onboarding.mark_item, db, scope, item_id, done)
     db.commit()
     return {"id": i.id, "done": i.done}
@@ -468,7 +487,7 @@ class ScoreIn(BaseModel):
 
 
 @router.post("/onboarding/{plan_id}/score")
-def onboarding_score(plan_id: int, body: ScoreIn, scope: Scope = Depends(require("hr.read")), db: Session = Depends(get_db)):
+def onboarding_score(plan_id: int, body: ScoreIn, scope: Scope = Depends(require("onboarding")), db: Session = Depends(get_db)):
     p = db.get(OnboardingPlan, plan_id)
     if not p:
         raise HTTPException(404, "Not found")
@@ -510,7 +529,7 @@ def sops(q: str = "", position_code: str | None = None, scope: Scope = Depends(p
 async def sops_upload(file: UploadFile, position_code: str | None = None, tags: str = "",
                       scope: Scope = Depends(require("hr.write")), db: Session = Depends(get_db)):
     """Upload .md / .txt. A markdown file with several '# Title' sections becomes several SOPs."""
-    text = (await file.read()).decode("utf-8-sig")
+    text = (await _read_upload(file)).decode("utf-8-sig")
     chunks, title, buf = [], (file.filename or "SOP").rsplit(".", 1)[0], []
     for line in text.splitlines():
         if line.startswith("# "):
@@ -545,7 +564,7 @@ def vacancies(scope: Scope = Depends(require("recruiting.read")), db: Session = 
 
 
 class VacancyIn(BaseModel):
-    title: str
+    title: str = Field(min_length=2, max_length=160)
     branch_id: int | None = None
     position_code: str | None = None
     salary_text: str | None = None
@@ -555,6 +574,8 @@ class VacancyIn(BaseModel):
 
 @router.post("/vacancies")
 def vacancy_create(body: VacancyIn, scope: Scope = Depends(require("recruiting")), db: Session = Depends(get_db)):
+    if body.branch_id and not scope.allows_branch(body.branch_id):
+        raise HTTPException(403, "Not your branch")
     v = Vacancy(**body.model_dump())
     db.add(v)
     db.flush()
@@ -568,7 +589,7 @@ def vacancy_create(body: VacancyIn, scope: Scope = Depends(require("recruiting")
 @router.post("/vacancies/{vid}/open")
 def vacancy_open(vid: int, scope: Scope = Depends(require("recruiting")), db: Session = Depends(get_db)):
     v = db.get(Vacancy, vid)
-    if not v:
+    if not v or (v.branch_id and not scope.allows_branch(v.branch_id)):
         raise HTTPException(404, "Not found")
     _guard(recruiting.open_vacancy, db, scope, v)
     db.commit()
@@ -597,7 +618,7 @@ class CandStatusIn(BaseModel):
 @router.post("/candidates/{cid}/status")
 def candidate_status(cid: int, body: CandStatusIn, scope: Scope = Depends(require("recruiting")), db: Session = Depends(get_db)):
     c = db.get(Candidate, cid)
-    if not c:
+    if not c or (c.vacancy and c.vacancy.branch_id and not scope.allows_branch(c.vacancy.branch_id)):
         raise HTTPException(404, "Not found")
     _guard(recruiting.set_status, db, scope, c, body.status)
     db.commit()

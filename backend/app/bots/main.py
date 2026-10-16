@@ -67,7 +67,9 @@ def agent_router(agent: str | None) -> Router:
                 if not scope_for_telegram(db, m.from_user.id).at_least("hr_head"):
                     return await start_interview(m)
             kb = miniapp_keyboard("/m/rauf", "👥 Nomzodlar")  # Rauf HR Mini App: candidates + decisions
-        await m.answer(f"👋 {cfg('company.name')} · {name}\nWrite your question in plain words. /id — your Telegram ID.",
+        await m.answer(f"👋 {cfg('company.name')} · {name}\nWrite your question in plain words. /id — your Telegram ID.\n\n"
+                       "🤖 Bu AI yordamchi. Ishga olish, oylik, jarima va arizalar bo'yicha qarorni faqat inson qabul qiladi.\n"
+                       "🤖 Это ИИ-ассистент. Решения о найме, зарплате, штрафах и заявках принимает только человек.",
                        reply_markup=kb)
 
     @r.message(Command("guruh"))
@@ -85,6 +87,12 @@ def agent_router(agent: str | None) -> Router:
         if agent == "rauf" and m.from_user.id in INTERVIEWS:
             return await interview_step(m)
         target = agent or route(text)
+        cmd = text.split()[0].split("@")[0].lower() if text else ""
+        if m.chat.type != "private" and not (target == "hamza" and cmd in GROUP_COMMANDS):
+            return await m.answer("🔒 Shaxsiy ma'lumotlar guruhda berilmaydi — menga shaxsiy chatda yozing. / "
+                                  "Личные данные в группе не выдаются — напишите мне в личку.")
+        if not _llm_quota_ok(m.from_user.id):
+            return await m.answer("Bugungi so'rovlar limiti tugadi. / Лимит запросов на сегодня исчерпан.")
         if agent == "rauf":
             with SessionLocal() as db:
                 if not scope_for_telegram(db, m.from_user.id).at_least("hr_head"):
@@ -97,11 +105,66 @@ def agent_router(agent: str | None) -> Router:
 
     @r.callback_query(F.data.startswith("vac:"))
     async def pick_vacancy(c: CallbackQuery):
-        INTERVIEWS[c.from_user.id] = {"vacancy_id": int(c.data[4:]), "step": "name", "answers": []}
-        await c.message.answer("Your full name?")
+        with SessionLocal() as db:
+            v = db.get(Vacancy, int(c.data[4:]))
+            today = sum(1 for x in db.scalars(select(Candidate).where(Candidate.telegram_id == c.from_user.id))
+                        if x.created_at.date() == date.today())
+        if not v or v.status != "open":
+            return await c.answer("Vacancy is closed", show_alert=True)
+        if today >= int(cfg("limits.interviews_per_candidate_per_day", 3)):
+            return await c.answer("Daily limit reached — try tomorrow", show_alert=True)
+        INTERVIEWS[c.from_user.id] = {"vacancy_id": v.id, "step": "consent", "answers": []}
+        kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="✅ Roziman / Согласен", callback_data="consent:yes"),
+                                                    InlineKeyboardButton(text="✖️ Yo'q / Нет", callback_data="consent:no")]])
+        days = cfg("recruiting.retention_days", 180)
+        await c.message.answer(
+            f"ℹ️ {cfg('company.name')} suhbat javoblaringizni vakansiya bo'yicha qaror uchun saqlaydi ({days} kungacha). "
+            "Javoblarni AI baholaydi, qarorni esa faqat HR xodimi qabul qiladi.\n"
+            f"ℹ️ {cfg('company.name')} сохраняет ваши ответы для решения по вакансии (до {days} дней). "
+            "Ответы оценивает ИИ, решение принимает только сотрудник HR.\nRoziman? / Согласны?", reply_markup=kb)
+        await c.answer()
+
+    @r.callback_query(F.data.startswith("pulse:"))
+    async def pulse_answer(c: CallbackQuery):
+        _, kind, val = c.data.split(":", 2)
+        from ..services import engagement
+        with SessionLocal() as db:
+            e = db.scalar(select(Employee).where(Employee.telegram_id == c.from_user.id))
+            if not e or (kind == "exit") != (e.status == "fired"):
+                return await c.answer("—")
+            score = int(val) if kind == "enps" else 0
+            ok = engagement.record_pulse(db, e, kind, score, reason=val if kind == "exit" else None)
+            db.commit()
+        await c.message.edit_reply_markup(reply_markup=None)
+        await c.answer("Rahmat! Javob anonim saqlandi. / Спасибо! Ответ сохранён анонимно." if ok else "Allaqachon javob bergansiz / Вы уже ответили")
+
+    @r.callback_query(F.data.startswith("consent:"))
+    async def consent(c: CallbackQuery):
+        st = INTERVIEWS.get(c.from_user.id)
+        if not st or st["step"] != "consent":
+            return await c.answer()
+        if c.data == "consent:no":
+            INTERVIEWS.pop(c.from_user.id, None)
+            await c.message.answer("Tushunarli, ma'lumot saqlanmadi. / Понятно, данные не сохранены.")
+        else:
+            st["step"], st["consent_at"] = "name", datetime.now().isoformat(timespec="seconds")
+            await c.message.answer("Ism-familiyangiz? / Ваше ФИО?")
         await c.answer()
 
     return r
+
+
+GROUP_COMMANDS = {"/hisobot", "/davomat"}  # aggregate-only commands allowed in group chats
+_quota: dict[tuple[int, str], int] = {}
+
+
+def _llm_quota_ok(tg_id: int) -> bool:
+    """OWASP LLM10 (unbounded consumption): cap model calls per user per day."""
+    key = (tg_id, date.today().isoformat())
+    _quota[key] = _quota.get(key, 0) + 1
+    if len(_quota) > 50_000:
+        _quota.clear()
+    return _quota[key] <= int(cfg("limits.messages_per_user_per_day", 200))
 
 
 def _esc(s: str) -> str:
@@ -128,6 +191,8 @@ async def interview_step(m: Message):
     if text.lower() in ("/bekor", "/cancel"):
         INTERVIEWS.pop(m.from_user.id, None)
         return await m.answer("Cancelled.")
+    if st["step"] == "consent":
+        return await m.answer("Iltimos, tugmani bosing. / Пожалуйста, нажмите кнопку выше.")
     if st["step"] == "name":
         st["name"], st["step"] = text[:160], "phone"
         return await m.answer("Your phone number?")
@@ -149,7 +214,8 @@ def _save_candidate(tg_id: int, st: dict) -> None:
     with SessionLocal() as db:
         v = db.get(Vacancy, st["vacancy_id"])
         c = Candidate(vacancy_id=v.id if v else None, full_name=st["name"], phone=st["phone"], telegram_id=tg_id,
-                      source="bot", answers=st["answers"])
+                      source="bot", answers=st["answers"],
+                      consent_at=datetime.fromisoformat(st["consent_at"]) if st.get("consent_at") else None)
         db.add(c)
         recruiting.apply_score(db, c, interview.score_answers(v, st["answers"]))  # no auto-reject
         db.commit()
@@ -213,6 +279,18 @@ async def send_reports(sender: Sender, kind: str) -> None:
         await sender.report(docs)
 
 
+def pulse_keyboard(kind: str) -> InlineKeyboardMarkup:
+    if kind == "exit":
+        from ..services.engagement import EXIT_REASONS
+        labels = {"pay": "💰 Maosh/ЗП", "schedule": "🕒 Grafik", "manager": "👤 Rahbar", "workload": "📦 Yuklama",
+                  "growth": "📈 O'sish/Рост", "personal": "🏠 Shaxsiy", "other": "… Boshqa"}
+        rows = [[InlineKeyboardButton(text=labels[r], callback_data=f"pulse:exit:{r}") for r in EXIT_REASONS[i:i + 2]]
+                for i in range(0, len(EXIT_REASONS), 2)]
+        return InlineKeyboardMarkup(inline_keyboard=rows)
+    nums = [InlineKeyboardButton(text=str(i), callback_data=f"pulse:enps:{i}") for i in range(11)]
+    return InlineKeyboardMarkup(inline_keyboard=[nums[:6], nums[6:]])
+
+
 async def send_notifications(sender: Sender) -> None:
     with SessionLocal() as db:
         notes = notifications.collect(db)
@@ -225,9 +303,25 @@ async def send_notifications(sender: Sender) -> None:
             else:
                 e = db.get(Employee, int(n.target.split(":")[1]))
                 ids = [e.telegram_id] if e and e.telegram_id else []
-            resolved.append((ids, n.text))
-    for ids, text in resolved:
-        await sender.to_ids(ids, text)
+            resolved.append((ids, n.text, n.kind))
+        db.commit()  # PulseSent marks
+    b = sender.bot()
+    for ids, text, kind in resolved:
+        if kind in ("pulse_enps", "pulse_exit"):
+            for i in ids:
+                try:
+                    await b.send_message(i, _esc(text), reply_markup=pulse_keyboard(kind.split("_")[1]))
+                except Exception as e:
+                    log.warning("pulse to %s failed: %s", i, e)
+        else:
+            await sender.to_ids(ids, _esc(text))  # notices are plain text; names must not become HTML
+
+
+def purge_personal_data() -> None:
+    with SessionLocal() as db:
+        n = recruiting.purge_candidates(db)
+        db.commit()
+    log.info("retention purge: %s candidate(s) anonymised", n)
 
 
 async def main() -> None:
@@ -252,6 +346,7 @@ async def main() -> None:
     sched.add_job(send_reports, "cron", hour=int(mh), minute=int(mm), args=[sender, "morning"])
     sched.add_job(send_reports, "cron", hour=int(eh), minute=int(em), args=[sender, "evening"])
     sched.add_job(send_notifications, "cron", hour=10, minute=0, args=[sender])
+    sched.add_job(purge_personal_data, "cron", hour=3, minute=0)
     sched.start()
 
     async def run(name: str, bot: Bot):

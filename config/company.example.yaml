@@ -21,7 +21,7 @@ regions:
   - { code: SAM, name: "Samarkand" }
 
 branches:            # branch = pharmacy / site / store
-  - { code: P01, name: "Pharmacy #1 Chilanzar", region: TAS, city: "Tashkent", mode: "24/7" }
+  - { code: P01, name: "Pharmacy #1 Chilanzar", region: TAS, city: "Tashkent", mode: "24/7", lat: 41.2756, lon: 69.2034, radius_m: 120 }
   - { code: P02, name: "Pharmacy #2 Yunusabad", region: TAS, city: "Tashkent", mode: "day" }
   - { code: P03, name: "Pharmacy #3 Registan",  region: SAM, city: "Samarkand", mode: "day" }
   - { code: OFC, name: "Head office",           region: TAS, city: "Tashkent", mode: "day" }
@@ -50,6 +50,32 @@ attendance:
   overtime_limit_hours: 40    # per 30 days, override per schedule below
   overtime_limit_by_schedule: { sutki_1_2: 80 }
   needs_review_after_hours: 30   # open check-in without check-out older than this -> needs review
+  # Anti-fraud for "Keldim": none | geo | qr | geo_or_qr. GPS alone can be faked — geo_or_qr is the pilot default.
+  # geo: branch lat/lon/radius set in the panel; qr: 6-digit code rotating every 60 s on the head's phone.
+  check_mode: geo_or_qr
+  max_gps_accuracy_m: 150
+  default_radius_m: 150
+  verify_checkout: false
+
+labor:                        # Labor Code of Uzbekistan (ZRU-798) — confirm with the client's lawyer
+  annual_leave_min_days: 21
+  leave_after_months: 6
+  overtime_year_cap_hours: 120
+  night_from: "22:00"
+  night_to: "06:00"
+  # pay rates are company/contract specific — keep them here, do not hard-code
+  overtime_rate: null
+  night_rate: null
+
+cabinet:
+  heads_see_salary: false     # may a pharmacy head see the salaries of their team in the Mini App?
+
+engagement:
+  enps_day: 25                # anonymous monthly eNPS in the bot (null = off); results shown only for 5+ answers
+
+limits:                       # OWASP LLM10 — cap model usage per person
+  messages_per_user_per_day: 200
+  interviews_per_candidate_per_day: 3
 
 payroll:
   kpi_cap: 1.2
@@ -98,6 +124,7 @@ recruiting:
   sla_days_by_position: { provisor: 30, pharmacist: 21, cashier: 14 }
   weights: { role_fit: 40, specifics: 25, communication: 15, motivation: 20 }
   shortlist_threshold: 70
+  retention_days: 180         # personal-data retention: rejected / stale candidates are anonymised after this
   required_vacancy_fields: [title, branch, salary_text, schedule_text]
 
 ads:

@@ -36,6 +36,15 @@ Everything is limited by branch scope.
 
 **Rauf's HR Mini App** at `/m/rauf` opens from Rauf's bot, for HR Telegram IDs only. It shows candidates with their scores and the Shortlist / Hired / Reject buttons; a person makes every decision.
 
+**New in v0.2:**
+- **Anti-fraud check-in:** the branch geofence, or a QR code on the head's phone that rotates every 60 s.
+- **Labor Code rules:** leave taken before 6 months of service is flagged, and overtime is capped at 120 h a year.
+- **SOP read receipts**, with read coverage shown in the panel.
+- **Anonymous eNPS and exit survey**, shown only for groups of 5+ answers.
+- **Turnover-risk signals**, visible to HR only.
+- **Candidate consent and a retention purge** for candidates' personal data.
+- **Security audit:** see [docs/SECURITY.md](docs/SECURITY.md).
+
 ## Built-in principles
 
 - **Seven decisions are made by a person only:** payroll approval, deductions, contract change, hiring, firing, mass broadcast, request approval.

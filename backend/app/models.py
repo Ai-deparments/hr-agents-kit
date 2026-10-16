@@ -28,6 +28,10 @@ class Branch(Base):
     region_id: Mapped[int | None] = mapped_column(ForeignKey("regions.id"))
     city: Mapped[str | None] = mapped_column(String(80))
     mode: Mapped[str] = mapped_column(String(10), default="day")  # day | 24/7
+    lat: Mapped[float | None] = mapped_column(Float)          # geofence centre for check-in
+    lon: Mapped[float | None] = mapped_column(Float)
+    radius_m: Mapped[int | None] = mapped_column(Integer)
+    qr_secret: Mapped[str | None] = mapped_column(String(64))  # rotating check-in code shown by the head
     region: Mapped[Region | None] = relationship()
 
 
@@ -95,6 +99,8 @@ class AttendanceEvent(Base):
     kind: Mapped[str] = mapped_column(String(4))  # in | out
     ts: Mapped[datetime] = mapped_column(DateTime, index=True)
     source: Mapped[str] = mapped_column(String(20), default="telegram")
+    verified: Mapped[str | None] = mapped_column(String(10))  # geo | qr | none — how the place was proven
+    distance_m: Mapped[int | None] = mapped_column(Integer)
 
 
 class LeadReport(Base):
@@ -237,6 +243,40 @@ class Sop(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=now, onupdate=now)
 
 
+class SopAck(Base):
+    """'I have read it' for a specific SOP version (updated_at at the moment of reading)."""
+    __tablename__ = "sop_acks"
+    __table_args__ = (UniqueConstraint("sop_id", "employee_id", "version"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    sop_id: Mapped[int] = mapped_column(ForeignKey("sops.id"))
+    employee_id: Mapped[int] = mapped_column(ForeignKey("employees.id"), index=True)
+    version: Mapped[str] = mapped_column(String(32))
+    ack_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+
+
+class PulseResponse(Base):
+    """Anonymous by design: no employee id is stored — only branch, month and kind."""
+    __tablename__ = "pulse_responses"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    kind: Mapped[str] = mapped_column(String(10))  # enps | exit
+    month: Mapped[str] = mapped_column(String(7), index=True)
+    branch_id: Mapped[int | None] = mapped_column(Integer)
+    score: Mapped[int] = mapped_column(Integer)  # 0..10
+    reason: Mapped[str | None] = mapped_column(String(40))  # exit: pay | schedule | manager | workload | growth | personal | other
+    comment: Mapped[str | None] = mapped_column(String(500))
+
+
+class PulseSent(Base):
+    """Who was asked / answered (to avoid double votes) — kept apart from the answers."""
+    __tablename__ = "pulse_sent"
+    __table_args__ = (UniqueConstraint("employee_id", "kind", "month"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    employee_id: Mapped[int] = mapped_column(ForeignKey("employees.id"))
+    kind: Mapped[str] = mapped_column(String(10))
+    month: Mapped[str] = mapped_column(String(7))
+    answered: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
 class Document(Base):
     __tablename__ = "documents"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -279,6 +319,8 @@ class Candidate(Base):
     label: Mapped[str | None] = mapped_column(String(10))
     status: Mapped[str] = mapped_column(String(10), default="new")  # new | shortlist | hired | rejected
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+    consent_at: Mapped[datetime | None] = mapped_column(DateTime)  # personal-data consent given in the bot
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime)  # for the retention purge
     vacancy: Mapped[Vacancy | None] = relationship()
 
 

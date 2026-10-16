@@ -88,6 +88,10 @@ def create_request(db: Session, scope: Scope, emp: Employee, kind: str, date_fro
         bal = emp.leave_balance_days
         if bal is not None and days > bal:
             raise ValueError(f"You ask for {days:g} days, your balance is {bal:g}")
+        # Labor Code: annual leave is due after N months of work; earlier only by agreement — flag it for the approver
+        months = int(cfg("labor.leave_after_months", 6))
+        if emp.hire_date and (date_from - emp.hire_date).days < months * 30:
+            comment = f"[!] Less than {months} months of service — early leave only by agreement. " + comment
     r = LeaveRequest(employee_id=emp.id, kind=kind, date_from=date_from, date_to=date_to, days=days,
                      comment=comment[:1000], channel=channel)
     db.add(r)

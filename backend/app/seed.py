@@ -35,7 +35,7 @@ def load_dictionaries(db: Session) -> None:
     for b in cfg("branches", []):
         if not db.scalar(select(Branch).where(Branch.code == b["code"])):
             db.add(Branch(code=b["code"], name=b["name"], region_id=regions.get(b.get("region")), city=b.get("city"),
-                          mode=b.get("mode", "day")))
+                          mode=b.get("mode", "day"), lat=b.get("lat"), lon=b.get("lon"), radius_m=b.get("radius_m")))
     for p in cfg("positions", []):
         if not db.scalar(select(Position).where(Position.code == p["code"])):
             db.add(Position(code=p["code"], title=p["title"], is_manager=bool(p.get("is_manager"))))
@@ -169,6 +169,16 @@ def demo(db: Session, today: date | None = None) -> None:
                                     "motivation": {"score": 70, "comment": "lives nearby"}})
     c2 = Candidate(vacancy_id=v1.id, full_name="Bobur Rasulov", source="hh")
     db.add_all([c1, c2])
+
+    # anonymous pulse answers (enough for the 5+ anonymity threshold) and some SOP read receipts
+    from .models import PulseResponse, SopAck
+    from .services.engagement import sop_version
+    for i, s in enumerate([9, 10, 7, 8, 6, 9, 3, 10]):
+        db.add(PulseResponse(kind="enps", month=today.strftime("%Y-%m"), branch_id=staff[i].branch_id, score=s))
+    db.flush()
+    for s in db.scalars(select(Sop)):
+        for e in staff[:6]:
+            db.add(SopAck(sop_id=s.id, employee_id=e.id, version=sop_version(s)))
 
     pw = os.getenv("DEMO_PASSWORD", "demo12345")
     for u, role, scope_codes, pay in [("hr", "hr_manager", None, False), ("buh", "payroll", None, True),

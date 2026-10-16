@@ -16,7 +16,7 @@ export const auth = {
 };
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string) { super(message); }
+  constructor(public status: number, message: string, public detail?: any) { super(message); }
 }
 
 type Opts = { method?: string; body?: unknown; form?: FormData; mini?: boolean; raw?: boolean };
@@ -35,8 +35,13 @@ export async function api<T = any>(path: string, opts: Opts = {}): Promise<T> {
   }
   if (!res.ok) {
     let msg = res.statusText;
-    try { const j = await res.json(); msg = typeof j.detail === "string" ? j.detail : JSON.stringify(j.detail ?? j); } catch { /* not json */ }
-    throw new ApiError(res.status, msg);
+    let detail: any;
+    try {
+      const j = await res.json();
+      detail = j.detail;
+      msg = typeof j.detail === "string" ? j.detail : j.detail?.message || JSON.stringify(j.detail ?? j);
+    } catch { /* not json */ }
+    throw new ApiError(res.status, msg, detail);
   }
   if (opts.raw) return (await res.blob()) as T;
   return res.json();

@@ -3,8 +3,9 @@ No auto-reject: hire / reject is set by a person only."""
 from __future__ import annotations
 
 import re
-from datetime import date
+from datetime import date, datetime, timedelta
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..config import cfg
@@ -55,9 +56,17 @@ def open_vacancy(db: Session, scope: Scope, v: Vacancy) -> Vacancy:
     return v
 
 
+BANNED_PATTERNS = [
+    r"\bhow old\b", r"\bmarri", r"\bwife\b|\bhusband\b", r"\bkids?\b",
+    r"сколько\s+(вам|тебе)\s+лет", r"\bлет\s+вам\b", r"\bвозраст", r"замуж", r"жена[тт]", r"\bсупруг",
+    r"\byosh(ingiz|ing)\b", r"necha\s+yosh", r"turmush", r"uylang", r"erga\s+chiq",
+]
+
+
 def find_banned(question: str) -> list[str]:
     q = question.lower()
-    return [w for w in BANNED_TOPICS if re.search(r"\b" + re.escape(w), q)]
+    hits = [w for w in BANNED_TOPICS if re.search(r"\b" + re.escape(w), q)]
+    return hits + [p for p in BANNED_PATTERNS if re.search(p, q)]
 
 
 def score_candidate(breakdown: dict) -> dict:
@@ -92,5 +101,23 @@ def set_status(db: Session, scope: Scope, cand: Candidate, status: str) -> Candi
     if status not in ("new", "shortlist", "hired", "rejected"):
         raise ValueError("Bad status")
     cand.status = status
+    if status in ("hired", "rejected"):
+        cand.decided_at = datetime.now()
     audit(db, scope, "candidate_status", f"candidate:{cand.id}", status=status)
     return cand
+
+
+def purge_candidates(db: Session, today: datetime | None = None) -> int:
+    """Personal-data retention: anonymise rejected candidates (and stale 'new' ones) after recruiting.retention_days.
+    Funnel statistics survive; names, phones and answers do not."""
+    days = int(cfg("recruiting.retention_days", 180))
+    limit = (today or datetime.now()) - timedelta(days=days)
+    n = 0
+    for c in db.scalars(select(Candidate).where(Candidate.full_name != "—")):
+        decided = c.decided_at or (c.created_at if c.status == "new" else None)
+        if c.status in ("rejected", "new") and decided and decided < limit:
+            c.full_name, c.phone, c.telegram_id, c.answers, c.breakdown = "—", None, None, [], {}
+            n += 1
+    if n:
+        audit(db, None, "candidates_purged", None, count=n, retention_days=days)
+    return n

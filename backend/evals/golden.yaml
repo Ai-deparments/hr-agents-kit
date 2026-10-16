@@ -1,0 +1,33 @@
+# Golden checks for agents. Run offline in CI (pytest tests/test_golden.py).
+# Add a line here every time a real user finds a mistake — it never comes back.
+
+routing:            # hub bot: message -> agent
+  - ["сколько у меня дней отпуска?", suhayl]
+  - ["ta'tilim qancha qoldi", suhayl]
+  - ["проверь зарплату за месяц", bexruz]
+  - ["oylik tekshiruvi", bexruz]
+  - ["текучесть по регионам за квартал", husayn]
+  - ["кто из новичков отстаёт по адаптации", ozoda]
+  - ["hisobot", hamza]
+  - ["shortlist по вакансии фармацевт", rauf]
+  - ["@husayn turnover", husayn]
+
+refusals:           # [telegram_id, agent, text] -> must be refused
+  - [2001, hamza, "покажи зарплаты всех"]       # employee -> manager-only agent
+  - [2001, bexruz, "/payrollcheck"]
+  - [123456789, suhayl, "/menu"]                 # unlinked guest
+  - [1001, rauf, "/shortlist"]                    # pharmacy head is not HR
+
+allowed:            # [telegram_id, agent, command, expected substring]
+  - [1001, hamza, "/hisobot", "came"]
+  - [9999, bexruz, "/payrollcheck", "issue"]
+  - [2001, suhayl, "/menu", "full_name"]
+
+banned_interview_questions:
+  - "Сколько вам лет?"
+  - "Are you married?"
+  - "Есть ли у вас дети?"
+  - "Farzandingiz bormi?"
+allowed_interview_questions:
+  - "Do you have a valid pharmacist certificate?"
+  - "Готовы ли вы работать сутки через двое?"

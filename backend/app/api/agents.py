@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hmac
+
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -43,7 +45,7 @@ def chat(agent: str, body: ChatIn, scope: Scope = Depends(panel_scope), db: Sess
 def ask(agent: str, body: ChatIn, x_api_key: str = Header(""), db: Session = Depends(get_db)):
     """Internal API for other systems (e.g. a CEO agent). Acts as HR head, never as owner."""
     key = settings().agent_api_key
-    if not key or x_api_key != key:
+    if not key or not hmac.compare_digest(x_api_key.encode(), key.encode()):
         raise HTTPException(401, "Bad API key")
     if agent not in AGENTS:
         raise HTTPException(404, "Unknown agent")

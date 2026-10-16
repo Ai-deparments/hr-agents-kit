@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..config import cfg
-from ..models import BranchLead, Employee, LeaveRequest
+from ..models import BranchLead, Employee, LeaveRequest, PulseSent
 from ..rbac import Scope
 from . import onboarding, payroll, people
 
@@ -52,6 +52,34 @@ def collect(db: Session, today: date | None = None) -> list[Notice]:
         if pc["count"]:
             out.append(Notice("hr", "payroll", f"💰 Payroll {month}: {pc['count']} issue(s) before payout, "
                                                f"at risk ≈ {pc['amount_at_risk'] or 0:,} {cfg('company.currency', 'UZS')}"))
+
+    # anonymous monthly eNPS (on the configured day) + exit survey for people who left in the last 3 days
+    month = today.strftime("%Y-%m")
+    asked = {(p.employee_id, p.kind) for p in db.scalars(select(PulseSent).where(PulseSent.month == month))}
+    linked = list(db.scalars(select(Employee).where(Employee.telegram_id.is_not(None))))
+    if cfg("engagement.enps_day") and today.day == int(cfg("engagement.enps_day")):
+        for e in linked:
+            if e.status != "fired" and (e.id, "enps") not in asked:
+                db.add(PulseSent(employee_id=e.id, kind="enps", month=month))
+                out.append(Notice(f"employee:{e.id}", "pulse_enps",
+                                  "📊 Anonim so'rov: bizni do'stlaringizga ish joyi sifatida tavsiya qilasizmi? (0–10)\n"
+                                  "Анонимный опрос: порекомендуете ли вы нас друзьям как место работы? (0–10)"))
+    for e in linked:
+        if e.status == "fired" and e.fire_date and 0 <= (today - e.fire_date).days <= 3 and (e.id, "exit") not in asked:
+            db.add(PulseSent(employee_id=e.id, kind="exit", month=month))
+            out.append(Notice(f"employee:{e.id}", "pulse_exit",
+                              "🙏 Biz bilan ishlaganingiz uchun rahmat. Ketishingizning asosiy sababi? (anonim)\n"
+                              "Спасибо за работу. Главная причина ухода? (анонимно)"))
+
+    # unread SOPs: remind once a week (Monday)
+    if today.weekday() == 0:
+        from . import engagement
+        for e in linked:
+            if e.status != "fired":
+                unread = engagement.my_unread(db, e)
+                if unread:
+                    out.append(Notice(f"employee:{e.id}", "sop", "📘 Yangi/yangilangan qoidalar / Новые правила: "
+                                      + ", ".join(u["title"] for u in unread[:5]) + " — Suhayl'ga «o'qidim» deb yozing."))
 
     # requests waiting > 24h
     stale = db.scalars(select(LeaveRequest).where(LeaveRequest.status == "pending",

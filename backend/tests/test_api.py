@@ -48,7 +48,12 @@ def test_miniapp_dev_checkin_and_lead():
     h = {"Authorization": f"Bearer {tok}"}
     me = c.get("/api/miniapp/me", headers=h).json()
     assert me["linked"] is True
-    assert c.post("/api/miniapp/check", json={"kind": "in"}, headers=h).json()["ok"]
+    r = c.post("/api/miniapp/check", json={"kind": "in"}, headers=h)  # P01 has a geofence: location required
+    assert r.status_code == 403 and r.json()["detail"]["need"] == "location"
+    far = c.post("/api/miniapp/check", json={"kind": "in", "lat": 41.35, "lon": 69.30, "accuracy": 20}, headers=h)
+    assert far.status_code == 403 and far.json()["detail"]["need"] == "qr"
+    ok = c.post("/api/miniapp/check", json={"kind": "in", "lat": 41.2757, "lon": 69.2035, "accuracy": 15}, headers=h).json()
+    assert ok["ok"] and ok["verified"] == "geo"
     assert c.get("/api/miniapp/lead/branches", headers=h).status_code == 403  # an employee is not a lead
 
 

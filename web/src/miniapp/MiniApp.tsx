@@ -1,19 +1,62 @@
+import QRCode from "qrcode";
 import { useEffect, useState } from "react";
 import { api, auth, money, monthISO, shiftDay, todayISO } from "../api";
 import { useT } from "../i18n";
 import { Err, Status } from "../ui";
 
 declare global {
-  interface Window { Telegram?: { WebApp?: { initData: string; ready: () => void; expand: () => void; colorScheme?: string; HapticFeedback?: { notificationOccurred: (t: string) => void } } } }
+  interface Window { Telegram?: { WebApp?: {
+    initData: string; ready: () => void; expand: () => void; colorScheme?: string;
+    HapticFeedback?: { notificationOccurred: (t: string) => void };
+    LocationManager?: { isInited: boolean; isLocationAvailable: boolean; init: (cb?: () => void) => void;
+      getLocation: (cb: (loc: { latitude: number; longitude: number; horizontal_accuracy?: number } | null) => void) => void };
+    showScanQrPopup?: (p: { text?: string }, cb: (data: string) => boolean | void) => void;
+    closeScanQrPopup?: () => void;
+  } } }
 }
 const tg = () => window.Telegram?.WebApp;
+
+type Loc = { lat: number; lon: number; accuracy?: number };
+
+/** Telegram LocationManager (Bot API 8.0+) first, browser geolocation as a fallback. */
+function getLocation(): Promise<Loc | null> {
+  return new Promise((resolve) => {
+    const lm = tg()?.LocationManager;
+    const viaBrowser = () => {
+      if (!navigator.geolocation) return resolve(null);
+      navigator.geolocation.getCurrentPosition(
+        (p) => resolve({ lat: p.coords.latitude, lon: p.coords.longitude, accuracy: p.coords.accuracy }),
+        () => resolve(null), { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+    };
+    if (!lm) return viaBrowser();
+    const ask = () => lm.isLocationAvailable
+      ? lm.getLocation((l) => resolve(l ? { lat: l.latitude, lon: l.longitude, accuracy: l.horizontal_accuracy } : null))
+      : viaBrowser();
+    lm.isInited ? ask() : lm.init(ask);
+  });
+}
+
+/** Telegram's native QR scanner; resolves with the scanned text (or null if closed / unsupported). */
+function scanQr(): Promise<string | null> {
+  return new Promise((resolve) => {
+    const w = tg();
+    if (!w?.showScanQrPopup) return resolve(null);
+    let done = false;
+    w.showScanQrPopup({ text: "Mudir telefonidagi QR / QR на телефоне заведующего" }, (data) => {
+      if (done) return true;
+      if (data?.startsWith("HRCHK:")) { done = true; resolve(data); return true; }
+      return false;
+    });
+    setTimeout(() => { if (!done) { done = true; w.closeScanQrPopup?.(); resolve(null); } }, 60000);
+  });
+}
 const mini = { mini: true };
 
 export default function MiniApp() {
   const [ready, setReady] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [me, setMe] = useState<any>(null);
-  const [tab, setTab] = useState<"me" | "report" | "month">("me");
+  const [tab, setTab] = useState<"me" | "report" | "month" | "qr">("me");
   const t = useT();
 
   const loadMe = () => api<any>("/api/miniapp/me", mini).then((m) => {
@@ -42,11 +85,13 @@ export default function MiniApp() {
       {tab === "me" && me.linked && <MeView me={me} reload={loadMe} />}
       {tab === "report" && lead && <LeadReport />}
       {tab === "month" && lead && <LeadMonth />}
+      {tab === "qr" && lead && <LeadQr />}
       {lead && (
         <nav className="mini-tabs">
           {me.linked && <button className={tab === "me" ? "active" : ""} onClick={() => setTab("me")}>{t("me")}</button>}
           <button className={tab === "report" ? "active" : ""} onClick={() => setTab("report")}>{t("report")}</button>
           <button className={tab === "month" ? "active" : ""} onClick={() => setTab("month")}>{t("month")}</button>
+          <button className={tab === "qr" ? "active" : ""} onClick={() => setTab("qr")}>QR</button>
         </nav>
       )}
     </div>
@@ -108,13 +153,42 @@ function MeView({ me, reload }: { me: any; reload: () => void }) {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useToast();
   const d = me.today;
-  const check = async (kind: "in" | "out") => {
+  const [cfg, setCfg] = useState<any>(null);
+  const [needCode, setNeedCode] = useState<"in" | "out" | null>(null);
+  const [code, setCode] = useState("");
+  useEffect(() => { api<any>("/api/miniapp/check/config", mini).then(setCfg).catch(() => setCfg({ mode: "none" })); }, []);
+
+  const send = (body: any) => api<any>("/api/miniapp/check", { body, mini: true });
+  const done = (kind: string, r: any) => {
+    tg()?.HapticFeedback?.notificationOccurred("success");
+    setToast(`${kind === "in" ? t("checkIn") : t("checkOut")} · ${String(r.ts).slice(11, 16)}${r.verified === "qr" ? " · QR ✓" : r.verified === "geo" ? " · 📍 ✓" : ""}`);
+    setNeedCode(null); setCode("");
+    reload();
+  };
+  const check = async (kind: "in" | "out", manualCode?: string) => {
     setBusy(true);
     try {
-      const r = await api<any>("/api/miniapp/check", { body: { kind }, mini: true });
-      tg()?.HapticFeedback?.notificationOccurred("success");
-      setToast(`${kind === "in" ? t("checkIn") : t("checkOut")} · ${String(r.ts).slice(11, 16)}`);
-      reload();
+      const verify = kind === "in" || cfg?.verify_checkout;
+      let body: any = { kind };
+      if (manualCode) body.code = manualCode;
+      else if (verify && cfg && cfg.mode !== "none" && cfg.mode !== "qr" && cfg.branch_has_geo) {
+        const loc = await getLocation();
+        if (loc) body = { ...body, ...loc };
+      }
+      try {
+        done(kind, await send(body));
+      } catch (x: any) {
+        if (x.detail?.need === "qr") {
+          const scanned = await scanQr();
+          if (scanned) return done(kind, await send({ kind, code: scanned }));
+          setNeedCode(kind);  // no camera / desktop: type the 6 digits from the head's screen
+          setToast(x.message);
+        } else if (x.detail?.need === "location") {
+          const loc = await getLocation();
+          if (!loc) { setToast("📍 Joylashuvga ruxsat bering / Разрешите доступ к геолокации"); return; }
+          done(kind, await send({ kind, ...loc }));
+        } else throw x;
+      }
     } catch (x: any) { setToast(x.message); } finally { setBusy(false); }
   };
   return (
@@ -127,6 +201,13 @@ function MeView({ me, reload }: { me: any; reload: () => void }) {
         <button className="big-btn in" disabled={busy} onClick={() => check("in")}>{t("checkIn")}</button>
         <button className="big-btn out" disabled={busy} onClick={() => check("out")}>{t("checkOut")}</button>
       </div>
+      {needCode && <form className="card stack" style={{ gap: 8 }} onSubmit={(e) => { e.preventDefault(); check(needCode, code); }}>
+        <b>Mudir ekranidagi 6 xonali kod / 6-значный код с экрана заведующего</b>
+        <input inputMode="numeric" pattern="[0-9]{6}" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+          style={{ fontSize: 28, textAlign: "center", letterSpacing: 8, fontFamily: "var(--mono)" }} autoFocus />
+        <button className="btn primary" disabled={busy || code.length !== 6}>OK</button>
+      </form>}
+      {cfg && cfg.mode !== "none" && <div className="muted small">🔒 {cfg.mode === "qr" ? "QR" : cfg.mode === "geo" ? "📍 GPS" : "📍 GPS / QR"} — joyda ekaningiz tekshiriladi · место отметки проверяется</div>}
       {me.open_shift_from_yesterday && <div className="note">Your shift from yesterday is still open — press “{t("checkOut")}” when you leave.</div>}
       <div className="card stack" style={{ gap: 6 }}>
         <div className="row"><b>{t("today")}</b><span className="spacer" /><Status s={d.status} /></div>
@@ -354,6 +435,37 @@ function PersonPage({ row, month, official, onBack }: { row: any; month: string;
         </div>
       )}
       <Toast text={toast} />
+    </div>
+  );
+}
+
+/* ---------- team lead: rotating check-in QR (anti-fraud) ---------- */
+function LeadQr() {
+  const { branches, branch, setBranch, err } = useBranches();
+  const [qr, setQr] = useState<any>(null);
+  const [svg, setSvg] = useState("");
+  const [e2, setE2] = useState<string | null>(null);
+  useEffect(() => {
+    if (!branch) return;
+    let alive = true;
+    const pull = () => api<any>(`/api/miniapp/lead/qr?branch_id=${branch}`, mini)
+      .then(async (d) => { if (!alive) return; setQr(d); setSvg(await QRCode.toString(d.payload, { type: "svg", margin: 1, width: 260 })); })
+      .catch((x) => setE2(x.message));
+    pull();
+    const id = setInterval(pull, 5000);
+    return () => { alive = false; clearInterval(id); };
+  }, [branch]);
+  return (
+    <div className="stack" style={{ gap: 12, textAlign: "center" }}>
+      <BranchPills branches={branches} branch={branch} setBranch={setBranch} />
+      <Err e={err || e2} />
+      <div className="muted small">Xodim «Keldim» bosganda shu QR'ni skanerlaydi. Kod har 60 soniyada yangilanadi.<br />
+        Сотрудник сканирует этот QR при «Keldim». Код меняется каждые 60 секунд.</div>
+      {qr && <>
+        <div className="card" style={{ display: "grid", placeItems: "center", padding: 16 }} dangerouslySetInnerHTML={{ __html: svg }} />
+        <div style={{ font: "800 40px var(--mono)", letterSpacing: 8 }}>{qr.code}</div>
+        <div className="muted small">{qr.expires_in} s</div>
+      </>}
     </div>
   );
 }

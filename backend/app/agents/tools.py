@@ -238,6 +238,33 @@ def _sop(ctx: Ctx, query: str = "", position_code: str | None = None):
     return res or {"info": "no SOP found for this role/topic yet"}
 
 
+@tool("my_unread_sops", "Rules (SOPs) for the user's position that they have not confirmed reading yet (current version).",
+      min_role="employee")
+def _my_unread(ctx: Ctx):
+    from ..services import engagement
+    return engagement.my_unread(ctx.db, _self(ctx)) or {"info": "all rules are confirmed"}
+
+
+@tool("ack_sop", "Record that the user has read a rule (SOP) — only after they explicitly say they read it.",
+      {"sop_id": I}, min_role="employee", required=["sop_id"])
+def _ack(ctx: Ctx, sop_id: int):
+    from ..services import engagement
+    return engagement.acknowledge(ctx.db, ctx.scope, _self(ctx), sop_id)
+
+
+@tool("risk_signals", "Turnover-risk signals (explainable rules) for HR. A reason to talk to the person, never a decision.",
+      min_role="hr_head")
+def _risk(ctx: Ctx):
+    from ..services import engagement
+    return engagement.risk_signals(ctx.db, ctx.scope)[:20]
+
+
+@tool("pulse_summary", "Anonymous eNPS and exit-survey summary (shown only for groups of 5+ answers).")
+def _pulse(ctx: Ctx, months: int = 3):
+    from ..services import engagement
+    return engagement.pulse_summary(ctx.db, ctx.scope, months)
+
+
 # ---------------- recruiting (Rauf HR mode) & ads ----------------
 
 

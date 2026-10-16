@@ -12,6 +12,7 @@ import { Approvals, Requests } from "./Requests";
 import { Documents, Onboarding } from "./Onboarding";
 import Recruiting from "./Recruiting";
 import Analytics from "./Analytics";
+import Engagement from "./Engagement";
 import { AgentChat, Audit, Chats, Knowledge } from "./Agents";
 
 type Page = { key: string; perm: string | null; el: () => JSX.Element };
@@ -28,6 +29,7 @@ const PAGES: Page[] = [
   { key: "documents", perm: "hr.read", el: () => <Documents /> },
   { key: "recruiting", perm: "recruiting.read", el: () => <Recruiting /> },
   { key: "analytics", perm: "hr.read", el: () => <Analytics /> },
+  { key: "engagement", perm: "hr.read", el: () => <Engagement /> },
   { key: "agents", perm: null, el: () => <AgentChat /> },
   { key: "knowledge", perm: null, el: () => <Knowledge /> },
   { key: "chats", perm: "hr.read", el: () => <Chats /> },

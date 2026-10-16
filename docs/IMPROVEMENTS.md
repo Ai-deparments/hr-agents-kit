@@ -21,7 +21,35 @@
 | Two SOP libraries | One `Sop` table, upload `.md` from the panel |
 | Unprotected web dashboard for recruiting | All panel routes are behind JWT; the Mini App needs a Telegram signature; agent API needs a key |
 
+## v0.2 (2026-10-17): added after the security audit and research
+
+| Feature | Why |
+|---|---|
+| **Anti-fraud check-in** (`attendance.check_mode`: geo / qr / geo_or_qr) | GPS pins are easy to fake. "Keldim" now needs the branch geofence (Telegram LocationManager, accuracy checked), or a 6-digit QR code that rotates every 60 s on the head's phone (Mini App → QR tab, scanned with Telegram's native scanner). Each event stores how it was verified |
+| **Labor Code rules** (`labor.*`) | Early vacation (under 6 months of service) is flagged for the approver. Payroll pre-check warns when overtime goes over 120 h a year |
+| **SOP read receipts** | Employees confirm "read" in Suhayl for the current version of each SOP. Monday reminders go to those who have not. The panel shows the % read per SOP |
+| **Anonymous eNPS and exit survey** | The monthly 0–10 question and the exit-reason buttons go out through the bot. Answers are stored with no person id, and any group smaller than 5 is hidden |
+| **Turnover-risk signals** | Explainable rules: lateness or absence trending up, first 90 days, warnings, swap or sick requests. HR only, and a reason to talk — never a decision |
+| **Candidate consent + retention purge** | The recruiter bot asks for consent before the interview. A nightly job anonymises rejected and stale candidates after 180 days |
+| **AI disclosure** | Each bot's `/start` says it is an AI assistant and that people make the decisions (Uzbekistan AI law) |
+| **Golden evals** (`backend/evals/golden.yaml`) | Routing, role refusals and banned interview questions, run in CI. They already caught 2 gaps in the question filter |
+| **Rauf recruiter panel + HR Mini App** | `/rauf` and `/m/rauf` |
+
 ## Next (roadmap)
+
+Ranked by value for effort, from the 2026-10 research:
+
+1. **Shift-swap marketplace.** An employee posts a shift, an eligible colleague (same role, no rest-time or 120 h conflict) claims it, the head approves with one tap, and the timesheet updates.
+2. **SOP quiz.** After "read", 3–5 questions as native Telegram quiz polls; store the score next to the receipt.
+3. **Interview scheduling.** After the shortlist the candidate picks a slot, with reminders 24 h and 2 h before; on a no-show the bot offers the next candidate.
+4. **Webhook mode for bots.** Use `secret_token` checked through `X-Telegram-Bot-Api-Secret-Token`, instead of polling.
+5. **RAG over SOPs.** pgvector, answers quote the SOP id and section, "I don't know" below the threshold, role filter at retrieval.
+6. **LLM observability.** Self-hosted Langfuse or OpenTelemetry: cost and latency per agent, plus nightly golden runs against Claude.
+7. **Automatic shift-schedule draft.** OR-Tools CP-SAT; the head approves the result.
+8. **Document intake with a vision model.** Diploma and medical book fields filled by the model and checked by a human; the raw image is deleted after verification.
+
+
+Also planned:
 
 1. **Voice:** speech-to-text for Suhayl and Rauf, and Russian + Uzbek text-to-speech (needs keys and the client's consent to send audio to cloud services).
 2. **Userbot for the ads agent:** a separate MTProto worker for searching channels and messaging admins. It keeps the existing safety rules: a human presses the first message; budget, red flags and the "never say paid" rule are checked in code.

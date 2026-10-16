@@ -9,11 +9,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..auth import make_token, miniapp_scope, verify_init_data
-from ..config import settings
+from ..config import cfg, settings
 from ..db import get_db
 from ..models import AttendanceEvent, Branch, Employee, LeadReport, PayrollEntry
 from ..rbac import Scope, audit, led_branches
-from ..services import attendance, payroll, schedules
+from ..services import attendance, checkin, payroll, schedules
 
 router = APIRouter(prefix="/api/miniapp")
 
@@ -42,7 +42,7 @@ def auth(body: AuthIn, db: Session = Depends(get_db)):
         tg_id = s.dev_telegram_id  # local development in a normal browser
     else:
         raise HTTPException(401, "Open this page from Telegram")
-    return {"token": make_token(str(tg_id), "miniapp", 7)}
+    return {"token": make_token(str(tg_id), "miniapp", 1)}
 
 
 def _self(scope: Scope, db: Session) -> Employee:
@@ -70,15 +70,33 @@ def me(scope: Scope = Depends(miniapp_scope), db: Session = Depends(get_db)):
 
 
 @router.get("/link/branches")
-def link_branches(db: Session = Depends(get_db)):
+def link_branches(db: Session = Depends(get_db), scope: Scope = Depends(miniapp_scope)):
     return [{"id": b.id, "name": b.name, "city": b.city} for b in db.scalars(select(Branch).order_by(Branch.name))]
+
+
+LINK_MAX_FAILS_PER_USER = 5   # per Telegram account per 24h
+LINK_MAX_FAILS_PER_CARD = 5   # per employee card per 24h -> card locked until HR links it
+
+
+def _link_fails(db: Session, *, actor: str | None = None, target: str | None = None) -> int:
+    from ..models import AuditLog
+    q = select(AuditLog.id).where(AuditLog.action == "link_failed", AuditLog.ts >= datetime.now() - timedelta(days=1))
+    if actor:
+        q = q.where(AuditLog.actor == actor)
+    if target:
+        q = q.where(AuditLog.target == target)
+    return len(list(db.scalars(q)))
 
 
 @router.get("/link/people")
 def link_people(branch_id: int, db: Session = Depends(get_db), scope: Scope = Depends(miniapp_scope)):
     """'pharmacy -> name' search. Only people not yet linked are listed."""
     q = select(Employee).where(Employee.branch_id == branch_id, Employee.status != "fired", Employee.telegram_id.is_(None))
-    return [{"id": e.id, "full_name": e.full_name} for e in db.scalars(q.order_by(Employee.full_name))]
+    # any Telegram user can open the bot, so show only "First L." — enough to find yourself, not a staff list
+    def short(n: str) -> str:
+        parts = n.split()
+        return parts[0] + (f" {parts[1][0]}." if len(parts) > 1 else "")
+    return [{"id": e.id, "full_name": short(e.full_name)} for e in db.scalars(q.order_by(Employee.full_name))]
 
 
 class LinkIn(BaseModel):
@@ -94,6 +112,9 @@ def link(body: LinkIn, tg_scope: Scope = Depends(miniapp_scope), db: Session = D
     e = db.get(Employee, body.employee_id)
     if not e or e.telegram_id:
         raise HTTPException(409, "Already linked — ask HR")
+    if (_link_fails(db, actor=tg_scope.actor) >= LINK_MAX_FAILS_PER_USER
+            or _link_fails(db, target=f"employee:{e.id}") >= LINK_MAX_FAILS_PER_CARD):
+        raise HTTPException(429, "Too many attempts — ask HR to link you in the panel")
     if not e.phone or not e.phone.replace(" ", "").endswith(body.phone_last4):
         audit(db, tg_scope, "link_failed", f"employee:{e.id}")
         db.commit()
@@ -106,6 +127,19 @@ def link(body: LinkIn, tg_scope: Scope = Depends(miniapp_scope), db: Session = D
 
 class CheckIn(BaseModel):
     kind: str  # in | out
+    lat: float | None = Field(default=None, ge=-90, le=90)
+    lon: float | None = Field(default=None, ge=-180, le=180)
+    accuracy: float | None = Field(default=None, ge=0, le=100000)
+    code: str | None = Field(default=None, max_length=64)
+
+
+@router.get("/check/config")
+def check_config(scope: Scope = Depends(miniapp_scope), db: Session = Depends(get_db)):
+    """What the Mini App must collect before 'Keldim': location, QR, or nothing."""
+    e = db.get(Employee, scope.employee_id) if scope.employee_id else None
+    b = e.branch if e else None
+    return {"mode": cfg("attendance.check_mode", "none"), "branch_has_geo": bool(b and b.lat is not None),
+            "verify_checkout": bool(cfg("attendance.verify_checkout", False))}
 
 
 @router.post("/check")
@@ -117,10 +151,18 @@ def check(body: CheckIn, scope: Scope = Depends(miniapp_scope), db: Session = De
     now = datetime.now()
     if last and last.kind == body.kind and (now - last.ts) < timedelta(minutes=2):
         return {"ok": True, "duplicate": True, "ts": last.ts}
-    db.add(AttendanceEvent(employee_id=e.id, kind=body.kind, ts=now, source="telegram"))
+    verdict = checkin.Verdict(True, "none")
+    if body.kind == "in" or cfg("attendance.verify_checkout", False):
+        verdict = checkin.verify(e.branch, body.lat, body.lon, body.accuracy, body.code)
+        if not verdict.ok:
+            audit(db, scope, "checkin_rejected", f"employee:{e.id}", reason=verdict.reason, distance_m=verdict.distance_m)
+            db.commit()
+            raise HTTPException(403, detail={"message": verdict.reason, "need": verdict.need})
+    db.add(AttendanceEvent(employee_id=e.id, kind=body.kind, ts=now, source="telegram",
+                           verified=verdict.verified, distance_m=verdict.distance_m))
     payroll.mark_changed(db, now.strftime("%Y-%m"))
     db.commit()
-    return {"ok": True, "ts": now}
+    return {"ok": True, "ts": now, "verified": verdict.verified}
 
 
 # ---------------- team-lead cabinet ----------------
@@ -149,6 +191,17 @@ def _report_window(d: date) -> None:
         first = (first - timedelta(days=1)).replace(day=1)
     if d > today or d < first:
         raise HTTPException(400, "Day is outside the reporting window")
+
+
+@router.get("/lead/qr")
+def lead_qr(branch_id: int, scope: Scope = Depends(miniapp_scope), db: Session = Depends(get_db)):
+    """Rotating check-in code the head shows on their phone; employees scan it in the Mini App."""
+    if branch_id not in _lead_branches(scope, db):
+        raise HTTPException(403, "Not your branch")
+    b = db.get(Branch, branch_id)
+    checkin.ensure_secret(b)
+    db.commit()
+    return checkin.qr_payload(b)
 
 
 @router.get("/lead/report")
@@ -212,8 +265,9 @@ def lead_month(branch_id: int, month: str | None = None, scope: Scope = Depends(
     if branch_id not in _lead_branches(scope, db):
         raise HTTPException(403, "Not your branch")
     month = month or date.today().strftime("%Y-%m")
-    # Team leads see the money of their own team only (set payroll=False here to hide it from heads).
-    lead_scope = Scope(scope.actor, "manager", {branch_id}, payroll=True)
+    # Team leads see the money of their own team only — and only if the company allows it (config).
+    see_money = scope.at_least("hr_head") or bool(cfg("cabinet.heads_see_salary", False))
+    lead_scope = Scope(scope.actor, "manager", {branch_id}, payroll=see_money and scope.payroll if scope.at_least("hr_head") else see_money)
     return payroll.payroll_table(db, lead_scope, month, branch_id)
 
 

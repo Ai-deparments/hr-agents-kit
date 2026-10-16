@@ -1,7 +1,8 @@
 import { createContext, useContext } from "react";
 
 export type Me = { username: string; full_name: string; role: string; branch_scope: number[] | null; payroll: boolean; perms: string[] };
-export type Branch = { id: number; code: string; name: string; region_id: number | null; city: string | null; mode: string };
+export type Branch = { id: number; code: string; name: string; region_id: number | null; city: string | null; mode: string;
+  lat?: number | null; lon?: number | null; radius_m?: number | null };
 export type Dicts = {
   regions: { id: number; code: string; name: string }[];
   branches: Branch[];

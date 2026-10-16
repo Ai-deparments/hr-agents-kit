@@ -177,6 +177,20 @@ def precheck(db: Session, scope: Scope, month: str, now: datetime | None = None)
         for e in entries.get(emp.id, []):
             if e.kind == "bonus" and emp.base_salary and e.amount > 0.3 * emp.base_salary:
                 add("large_bonus", f"Bonus {e.amount} > 30% of salary — confirm basis: '{e.reason}'", e.amount)
+    # Labor Code: overtime is capped per year (default 120 h) — sum this year's months up to this one
+    cap = cfg("labor.overtime_year_cap_hours", 120)
+    if cap:
+        y, m = map(int, month.split("-"))
+        ytd: dict[int, float] = {}
+        for mm in range(1, m + 1):
+            for r in (tabel["rows"] if mm == m else att.month_tabel(db, scope, f"{y}-{mm:02d}", None, now)["rows"]):
+                ytd[r["employee_id"]] = ytd.get(r["employee_id"], 0) + r["overtime_hours"]
+        for eid, hours in ytd.items():
+            if hours > float(cap) and eid in emps:
+                e = emps[eid]
+                issues.append({"type": "overtime_year_cap", "employee_id": eid, "full_name": e.full_name,
+                               "branch": e.branch.name if e.branch else "—",
+                               "detail": f"Overtime this year {hours:.1f} h > legal cap {cap} h", "amount_at_risk": None})
     p = db.get(PeriodStatus, month)
     if p and p.changed_after_calc:
         issues.append({"type": "changed_after_calc", "employee_id": None, "full_name": "—", "branch": "—",
