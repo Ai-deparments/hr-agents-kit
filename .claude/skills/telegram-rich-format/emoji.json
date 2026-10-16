@@ -1,0 +1,773 @@
+{
+ "_readme": "Premium (custom) emoji registry. Write :name: in a message; tgfmt.py turns it into <tg-emoji emoji-id=ID>fallback</tg-emoji>. Empty id = plain fallback emoji. Variants of the same emoji are name_2, name_3… Get more ids: forward a premium emoji to an id bot, or `tgfmt.py pack <set>`.",
+ "glow_star": {
+  "id": "5343872599732542019",
+  "fallback": "🌟",
+  "use": "highlight, featured"
+ },
+ "check": {
+  "id": "5316653334688446735",
+  "fallback": "✅",
+  "use": "done, success"
+ },
+ "purple_heart": {
+  "id": "5316643215745498571",
+  "fallback": "💜",
+  "use": "love, brand accent"
+ },
+ "ghost": {
+  "id": "5316798307014556036",
+  "fallback": "👻",
+  "use": "fun, mystery"
+ },
+ "blue_heart": {
+  "id": "5316990468146346495",
+  "fallback": "💙",
+  "use": "love, trust"
+ },
+ "paw": {
+  "id": "5316994101688677895",
+  "fallback": "🐾",
+  "use": "steps, tracking"
+ },
+ "lightning": {
+  "id": "5319070993254201336",
+  "fallback": "⚡️",
+  "use": "fast, quick tip"
+ },
+ "butterfly": {
+  "id": "5316790180936431490",
+  "fallback": "🦋",
+  "use": "change, new look"
+ },
+ "blue_heart_2": {
+  "id": "5316921740079675140",
+  "fallback": "💙",
+  "use": "love, trust"
+ },
+ "low_battery": {
+  "id": "5316523974568457893",
+  "fallback": "🪫",
+  "use": "low, running out"
+ },
+ "heart_suit": {
+  "id": "5316561753100792764",
+  "fallback": "♥️",
+  "use": "like"
+ },
+ "heart": {
+  "id": "5316802593391916971",
+  "fallback": "❤️",
+  "use": "likes, thanks"
+ },
+ "wallet": {
+  "id": "5316979275461573049",
+  "fallback": "👛",
+  "use": "payment, balance"
+ },
+ "dog": {
+  "id": "5319301933645707826",
+  "fallback": "🐶",
+  "use": "fun"
+ },
+ "top": {
+  "id": "5316635510574169206",
+  "fallback": "🔝",
+  "use": "top result, best"
+ },
+ "top_2": {
+  "id": "5316562831137585026",
+  "fallback": "🔝",
+  "use": "top result, best"
+ },
+ "gear": {
+  "id": "5316977664848837418",
+  "fallback": "⚙️",
+  "use": "settings, setup"
+ },
+ "rocket": {
+  "id": "5316571734604790521",
+  "fallback": "🚀",
+  "use": "launch, release, growth"
+ },
+ "bolt": {
+  "id": "5316603792240687281",
+  "fallback": "🔩",
+  "use": "tools, details"
+ },
+ "disguise": {
+  "id": "5316722951813346475",
+  "fallback": "🥸",
+  "use": "humor"
+ },
+ "pin": {
+  "id": "5316883252877738187",
+  "fallback": "📍",
+  "use": "important point, location"
+ },
+ "sparkles": {
+  "id": "5319201848022808495",
+  "fallback": "✨",
+  "use": "new feature, highlight"
+ },
+ "cross": {
+  "id": "5316538964004321334",
+  "fallback": "🚫",
+  "use": "failed, forbidden"
+ },
+ "chart_up": {
+  "id": "5318974936310627698",
+  "fallback": "⏫",
+  "use": "growth, metrics up"
+ },
+ "chart_down": {
+  "id": "5316815985099946114",
+  "fallback": "⏬",
+  "use": "metrics down"
+ },
+ "lightning_2": {
+  "id": "5316702348855227508",
+  "fallback": "⚡️",
+  "use": "fast, quick tip"
+ },
+ "heart_suit_2": {
+  "id": "5316558587709897824",
+  "fallback": "♥️",
+  "use": "like"
+ },
+ "anatomical_heart": {
+  "id": "5316963916658522983",
+  "fallback": "🫀",
+  "use": "core, heart of it"
+ },
+ "muscle": {
+  "id": "5316595051982239381",
+  "fallback": "💪",
+  "use": "strength, done hard work"
+ },
+ "siren": {
+  "id": "5316996996496639181",
+  "fallback": "🚨",
+  "use": "urgent alert"
+ },
+ "user": {
+  "id": "5316705578670636235",
+  "fallback": "👤",
+  "use": "person, profile"
+ },
+ "guitar": {
+  "id": "5316993667896981960",
+  "fallback": "🎸",
+  "use": "fun, music"
+ },
+ "dove": {
+  "id": "5316691250659737086",
+  "fallback": "🕊",
+  "use": "calm, peace"
+ },
+ "moon": {
+  "id": "5316710702566619149",
+  "fallback": "🌙",
+  "use": "evening, night"
+ },
+ "gamepad": {
+  "id": "5316728625465146646",
+  "fallback": "🎮",
+  "use": "games"
+ },
+ "zzz": {
+  "id": "5316982535341750234",
+  "fallback": "💤",
+  "use": "sleep, idle"
+ },
+ "ufo": {
+  "id": "5317028126419597387",
+  "fallback": "🛸",
+  "use": "something new"
+ },
+ "heart_2": {
+  "id": "5316647102690900390",
+  "fallback": "❤️",
+  "use": "likes, thanks"
+ },
+ "pray": {
+  "id": "5316977222467206948",
+  "fallback": "🙏",
+  "use": "thanks, please"
+ },
+ "alien": {
+  "id": "5316930493223025689",
+  "fallback": "👾",
+  "use": "AI, bot, tech"
+ },
+ "zzz_2": {
+  "id": "5316854201718947305",
+  "fallback": "💤",
+  "use": "sleep, idle"
+ },
+ "mute": {
+  "id": "5316639745411922559",
+  "fallback": "🔇",
+  "use": "silent, quiet mode"
+ },
+ "warning": {
+  "id": "5316826301611390284",
+  "fallback": "‼️",
+  "use": "attention, important"
+ },
+ "check_2": {
+  "id": "5318760565902947324",
+  "fallback": "✅",
+  "use": "done, success"
+ },
+ "fire": {
+  "id": "5316924123786524990",
+  "fallback": "🔥",
+  "use": "hook, hot, trending"
+ },
+ "star": {
+  "id": "5319156402973849743",
+  "fallback": "⭐️",
+  "use": "rating, favourite"
+ },
+ "radio_button": {
+  "id": "5316770651720137011",
+  "fallback": "🔘",
+  "use": "option, choice"
+ },
+ "chat": {
+  "id": "5316558016479245582",
+  "fallback": "💬",
+  "use": "comments, messages"
+ },
+ "free": {
+  "id": "5316902932417885675",
+  "fallback": "🆓",
+  "use": "free, no cost"
+ },
+ "money": {
+  "id": "5316711376876485361",
+  "fallback": "💰",
+  "use": "revenue, price"
+ },
+ "question": {
+  "id": "5316738057213327417",
+  "fallback": "❓",
+  "use": "question, FAQ"
+ },
+ "heart_3": {
+  "id": "5319071281017009756",
+  "fallback": "❤️",
+  "use": "likes, thanks"
+ },
+ "brain": {
+  "id": "5316765712507747050",
+  "fallback": "🧠",
+  "use": "AI, insight"
+ },
+ "anatomical_heart_2": {
+  "id": "5316505214151308770",
+  "fallback": "🫀",
+  "use": "core, heart of it"
+ },
+ "star_2": {
+  "id": "5316504505481709320",
+  "fallback": "⭐️",
+  "use": "rating, favourite"
+ },
+ "heart_4": {
+  "id": "5316517648081631711",
+  "fallback": "❤️",
+  "use": "likes, thanks"
+ },
+ "neutral": {
+  "id": "5316631550614322609",
+  "fallback": "😐",
+  "use": "meh"
+ },
+ "fire_2": {
+  "id": "5316692783963060623",
+  "fallback": "🔥",
+  "use": "hook, hot, trending"
+ },
+ "fire_3": {
+  "id": "5318765891662395565",
+  "fallback": "🔥",
+  "use": "hook, hot, trending"
+ },
+ "purple_heart_2": {
+  "id": "5319091153830688459",
+  "fallback": "💜",
+  "use": "love, brand accent"
+ },
+ "pirate": {
+  "id": "5316560584869690299",
+  "fallback": "🏴‍☠️",
+  "use": "bold move"
+ },
+ "snake": {
+  "id": "5316881354502192070",
+  "fallback": "🐍",
+  "use": "Python"
+ },
+ "briefcase": {
+  "id": "5317051834639071081",
+  "fallback": "💼",
+  "use": "business, work"
+ },
+ "camera": {
+  "id": "5318948019750581913",
+  "fallback": "🎥",
+  "use": "video, reels"
+ },
+ "cat": {
+  "id": "5319250759110374827",
+  "fallback": "🐈",
+  "use": "fun"
+ },
+ "signal": {
+  "id": "5319164151094849427",
+  "fallback": "📶",
+  "use": "stats, reach"
+ },
+ "droplets": {
+  "id": "5316589275251226951",
+  "fallback": "💦",
+  "use": "fresh"
+ },
+ "check_3": {
+  "id": "5316561083085895267",
+  "fallback": "✅",
+  "use": "done, success"
+ },
+ "white_circle": {
+  "id": "5318770787925113164",
+  "fallback": "⚪️",
+  "use": "neutral bullet"
+ },
+ "idea": {
+  "id": "5316637280100693932",
+  "fallback": "💡",
+  "use": "idea, tip"
+ },
+ "clock": {
+  "id": "5316575093269214796",
+  "fallback": "⏰",
+  "use": "time, deadline"
+ },
+ "moon_2": {
+  "id": "5317055824663688741",
+  "fallback": "🌙",
+  "use": "evening, night"
+ },
+ "ring": {
+  "id": "5319090522470495400",
+  "fallback": "⭕️",
+  "use": "goal, target"
+ },
+ "siren_2": {
+  "id": "5316575892133132571",
+  "fallback": "🚨",
+  "use": "urgent alert"
+ },
+ "check_4": {
+  "id": "5316827280863934685",
+  "fallback": "✅",
+  "use": "done, success"
+ },
+ "thumbs_down": {
+  "id": "5316660455744223443",
+  "fallback": "👎",
+  "use": "bad, dislike"
+ },
+ "bomb": {
+  "id": "5316919747214854314",
+  "fallback": "💣",
+  "use": "big news"
+ },
+ "radioactive": {
+  "id": "5316832958810698866",
+  "fallback": "☢️",
+  "use": "danger"
+ },
+ "stop": {
+  "id": "5319109106793986870",
+  "fallback": "⏹",
+  "use": "stop, paused"
+ },
+ "whale": {
+  "id": "5316709027529374004",
+  "fallback": "🐋",
+  "use": "big client"
+ },
+ "footprints": {
+  "id": "5316899608113200563",
+  "fallback": "👣",
+  "use": "steps, progress"
+ },
+ "kiss": {
+  "id": "5316683820366313472",
+  "fallback": "💋",
+  "use": "fun"
+ },
+ "heart_5": {
+  "id": "5316630292188903702",
+  "fallback": "❤️",
+  "use": "likes, thanks"
+ },
+ "hand": {
+  "id": "5317017092648613267",
+  "fallback": "🫱",
+  "use": "offer, help"
+ },
+ "ant": {
+  "id": "5316613919773571522",
+  "fallback": "🐜",
+  "use": "small steps"
+ },
+ "herb": {
+  "id": "5316784421385287192",
+  "fallback": "🌿",
+  "use": "growth, organic"
+ },
+ "dizzy": {
+  "id": "5316883317302246413",
+  "fallback": "💫",
+  "use": "magic, wow"
+ },
+ "pour": {
+  "id": "5317026537281697397",
+  "fallback": "🫗",
+  "use": "flow, overflow"
+ },
+ "test_tube": {
+  "id": "5316570171236694774",
+  "fallback": "🧪",
+  "use": "experiment, test"
+ },
+ "bomb_2": {
+  "id": "5316690640774378899",
+  "fallback": "💣",
+  "use": "big news"
+ },
+ "planet": {
+  "id": "5318987567809443875",
+  "fallback": "🪐",
+  "use": "big picture"
+ },
+ "tree": {
+  "id": "5316729308364945163",
+  "fallback": "🌳",
+  "use": "growth"
+ },
+ "planet_2": {
+  "id": "5316968838691043737",
+  "fallback": "🪐",
+  "use": "big picture"
+ },
+ "n0": {
+  "id": "5316583502815181482",
+  "fallback": "0️⃣",
+  "use": "number 0"
+ },
+ "n1": {
+  "id": "5316544002000958685",
+  "fallback": "1️⃣",
+  "use": "number 1"
+ },
+ "n2": {
+  "id": "5316673387890751150",
+  "fallback": "2️⃣",
+  "use": "number 2"
+ },
+ "n3": {
+  "id": "5316702039617583319",
+  "fallback": "3️⃣",
+  "use": "number 3"
+ },
+ "n4": {
+  "id": "5316540608976798560",
+  "fallback": "4️⃣",
+  "use": "number 4"
+ },
+ "n5": {
+  "id": "5316842188695419690",
+  "fallback": "5️⃣",
+  "use": "number 5"
+ },
+ "n6": {
+  "id": "5316515891440008256",
+  "fallback": "6️⃣",
+  "use": "number 6"
+ },
+ "bell": {
+  "id": "",
+  "fallback": "🔔",
+  "use": "reminder, alert"
+ },
+ "chart": {
+  "id": "",
+  "fallback": "📊",
+  "use": "report header"
+ },
+ "target": {
+  "id": "",
+  "fallback": "🎯",
+  "use": "goal, focus"
+ },
+ "trophy": {
+  "id": "",
+  "fallback": "🏆",
+  "use": "best result, winner"
+ },
+ "robot": {
+  "id": "5280514002391180331",
+  "fallback": "🤖",
+  "use": "AI agent, automation"
+ },
+ "tools": {
+  "id": "",
+  "fallback": "🛠",
+  "use": "how-to, setup"
+ },
+ "calendar": {
+  "id": "",
+  "fallback": "📅",
+  "use": "date, schedule"
+ },
+ "link": {
+  "id": "",
+  "fallback": "🔗",
+  "use": "link line"
+ },
+ "point_down": {
+  "id": "",
+  "fallback": "👇",
+  "use": "CTA below"
+ },
+ "point_right": {
+  "id": "",
+  "fallback": "👉",
+  "use": "next step"
+ },
+ "eyes": {
+  "id": "",
+  "fallback": "👀",
+  "use": "views"
+ },
+ "gift": {
+  "id": "",
+  "fallback": "🎁",
+  "use": "bonus, lead magnet"
+ },
+ "megaphone": {
+  "id": "",
+  "fallback": "📣",
+  "use": "announcement"
+ },
+ "party": {
+  "id": "5368635272332352173",
+  "fallback": "🎉",
+  "use": "celebration"
+ },
+ "lock": {
+  "id": "",
+  "fallback": "🔒",
+  "use": "security, private"
+ },
+ "chat_2": {
+  "id": "5368538154531855717",
+  "fallback": "💬",
+  "use": "comments, messages"
+ },
+ "droplet": {
+  "id": "5280730086490809931",
+  "fallback": "💧",
+  "use": "fresh, clean"
+ },
+ "wave": {
+  "id": "5280856388594082819",
+  "fallback": "👋",
+  "use": "greeting, hello"
+ },
+ "wow": {
+  "id": "5280703827060762230",
+  "fallback": "😮",
+  "use": "surprise"
+ },
+ "cyclone": {
+  "id": "5281016547924552435",
+  "fallback": "🌀",
+  "use": "loading, process"
+ },
+ "cyclone_2": {
+  "id": "5280988626342159450",
+  "fallback": "🌀",
+  "use": "loading, process"
+ },
+ "cyclone_3": {
+  "id": "5283240443335715153",
+  "fallback": "🌀",
+  "use": "loading, process"
+ },
+ "runner": {
+  "id": "5282945280298231178",
+  "fallback": "🏃‍♀️",
+  "use": "fast, in progress"
+ },
+ "runner_2": {
+  "id": "5280876678019590192",
+  "fallback": "🏃‍♀️",
+  "use": "fast, in progress"
+ },
+ "robot_2": {
+  "id": "5282890132918151239",
+  "fallback": "🤖",
+  "use": "AI agent, automation"
+ },
+ "robot_3": {
+  "id": "5280785246755792195",
+  "fallback": "🤖",
+  "use": "AI agent, automation"
+ },
+ "robot_4": {
+  "id": "5283160694382962196",
+  "fallback": "🤖",
+  "use": "AI agent, automation"
+ },
+ "crab": {
+  "id": "5280621891969654631",
+  "fallback": "🦀",
+  "use": "Rust, fun"
+ },
+ "crab_2": {
+  "id": "5280512915764455854",
+  "fallback": "🦀",
+  "use": "Rust, fun"
+ },
+ "crab_3": {
+  "id": "5280775741993165492",
+  "fallback": "🦀",
+  "use": "Rust, fun"
+ },
+ "crab_4": {
+  "id": "5280550372174244939",
+  "fallback": "🦀",
+  "use": "Rust, fun"
+ },
+ "crab_5": {
+  "id": "5280842116417758634",
+  "fallback": "🦀",
+  "use": "Rust, fun"
+ },
+ "crab_6": {
+  "id": "5282731850488391605",
+  "fallback": "🦀",
+  "use": "Rust, fun"
+ },
+ "crab_7": {
+  "id": "5280606133734646186",
+  "fallback": "🦀",
+  "use": "Rust, fun"
+ },
+ "crab_8": {
+  "id": "5280828286623066201",
+  "fallback": "🦀",
+  "use": "Rust, fun"
+ },
+ "crab_9": {
+  "id": "5280517339580768218",
+  "fallback": "🦀",
+  "use": "Rust, fun"
+ },
+ "crab_10": {
+  "id": "5280573384609013819",
+  "fallback": "🦀",
+  "use": "Rust, fun"
+ },
+ "crab_11": {
+  "id": "5280761641615535047",
+  "fallback": "🦀",
+  "use": "Rust, fun"
+ },
+ "crab_12": {
+  "id": "5283040701586646017",
+  "fallback": "🦀",
+  "use": "Rust, fun"
+ },
+ "crab_13": {
+  "id": "5283273252590891274",
+  "fallback": "🦀",
+  "use": "Rust, fun"
+ },
+ "crab_14": {
+  "id": "5280761151989261646",
+  "fallback": "🦀",
+  "use": "Rust, fun"
+ },
+ "crab_15": {
+  "id": "5280941244262951651",
+  "fallback": "🦀",
+  "use": "Rust, fun"
+ },
+ "crab_16": {
+  "id": "5282959097208023883",
+  "fallback": "🦀",
+  "use": "Rust, fun"
+ },
+ "chat_3": {
+  "id": "5368808376694248152",
+  "fallback": "💬",
+  "use": "comments, messages"
+ },
+ "finish": {
+  "id": "5368434680179758177",
+  "fallback": "🏁",
+  "use": "finished, deadline"
+ },
+ "weightlifter": {
+  "id": "5368387680352637360",
+  "fallback": "🏋️‍♂️",
+  "use": "hard work, training"
+ },
+ "chat_4": {
+  "id": "5368785355669544236",
+  "fallback": "💬",
+  "use": "comments, messages"
+ },
+ "x_mark": {
+  "id": "5366194463892870536",
+  "fallback": "✖️",
+  "use": "close, no"
+ },
+ "pilot": {
+  "id": "5368842319820789939",
+  "fallback": "👨‍✈️",
+  "use": "lead, autopilot"
+ },
+ "coder": {
+  "id": "5366584601542169393",
+  "fallback": "👨‍💻",
+  "use": "developer, coding"
+ },
+ "robot_5": {
+  "id": "5368672282065541765",
+  "fallback": "🤖",
+  "use": "AI agent, automation"
+ },
+ "egg": {
+  "id": "5366122050744262072",
+  "fallback": "🥚",
+  "use": "new, early stage"
+ },
+ "race_car": {
+  "id": "5368603575473708147",
+  "fallback": "🏎",
+  "use": "speed, performance"
+ },
+ "chat_5": {
+  "id": "5368733171816898559",
+  "fallback": "💬",
+  "use": "comments, messages"
+ }
+}
