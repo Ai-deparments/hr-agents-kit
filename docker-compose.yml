@@ -1,0 +1,23 @@
+services:
+  api:
+    build: .
+    env_file: .env
+    volumes:
+      - hrdata:/data
+      - ./config/company.yaml:/app/config/company.yaml:ro
+    ports:
+      - "127.0.0.1:8000:8000"   # put a TLS reverse proxy (Caddy/nginx) in front
+    restart: unless-stopped
+
+  bots:
+    build: .
+    env_file: .env
+    command: ["python", "-m", "app.bots.main"]
+    volumes:
+      - hrdata:/data
+      - ./config/company.yaml:/app/config/company.yaml:ro
+    depends_on: [api]
+    restart: unless-stopped
+
+volumes:
+  hrdata:

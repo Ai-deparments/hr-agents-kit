@@ -1,0 +1,117 @@
+# Company profile — the ONLY place a new client is configured.
+# Copy to config/company.yaml and edit. No brand names live in code.
+
+company:
+  name: "Demo Pharmacy"
+  description: "pharmacy chain"
+  timezone: "Asia/Tashkent"
+  currency: "UZS"
+  default_language: "uz"        # uz | ru | en
+  hr_phone: "+998 00 000 00 00"
+  apply_form_url: ""
+  recruiter_bot: "@demo_recruiter_bot"
+
+branding:
+  short: "DEMO HR"
+  primary_color: "#0F766E"
+  accent_color: "#F59E0B"
+
+regions:
+  - { code: TAS, name: "Tashkent" }
+  - { code: SAM, name: "Samarkand" }
+
+branches:            # branch = pharmacy / site / store
+  - { code: P01, name: "Pharmacy #1 Chilanzar", region: TAS, city: "Tashkent", mode: "24/7" }
+  - { code: P02, name: "Pharmacy #2 Yunusabad", region: TAS, city: "Tashkent", mode: "day" }
+  - { code: P03, name: "Pharmacy #3 Registan",  region: SAM, city: "Samarkand", mode: "day" }
+  - { code: OFC, name: "Head office",           region: TAS, city: "Tashkent", mode: "day" }
+
+positions:           # is_manager -> role "manager" in bots
+  - { code: head,        title: "Pharmacy head",     is_manager: true }
+  - { code: regional,    title: "Regional manager",  is_manager: true }
+  - { code: pharmacist,  title: "Pharmacist" }
+  - { code: provisor,    title: "Provisor" }
+  - { code: cashier,     title: "Cashier" }
+  - { code: courier,     title: "Courier" }
+  - { code: cleaner,     title: "Cleaner" }
+  - { code: accountant,  title: "Payroll accountant" }
+  - { code: hr,          title: "HR specialist" }
+
+schedules:
+  # fixed: weekdays 0=Mon..6=Sun ; cycle: pattern of work(1)/rest(0) days from anchor date
+  day_9_18:  { type: fixed, start: "09:00", hours: 8,  lunch_min: 60, weekdays: [0,1,2,3,4] }
+  day_6x:    { type: fixed, start: "09:00", hours: 8,  lunch_min: 60, weekdays: [0,1,2,3,4,5] }
+  shift_2_2: { type: cycle, start: "08:00", hours: 12, lunch_min: 0,  pattern: [1,1,0,0], anchor: "2026-01-01" }
+  sutki_1_2: { type: cycle, start: "08:00", hours: 24, lunch_min: 0,  pattern: [1,0,0],   anchor: "2026-01-01" }
+
+attendance:
+  source: telegram            # telegram | turnstile
+  late_grace_min: 10
+  overtime_limit_hours: 40    # per 30 days, override per schedule below
+  overtime_limit_by_schedule: { sutki_1_2: 80 }
+  needs_review_after_hours: 30   # open check-in without check-out older than this -> needs review
+
+payroll:
+  kpi_cap: 1.2
+  late_penalty: { enabled: false, grace_min: 15, per_30_min_share_of_hour: 0.5, max_share_of_salary: 0.10 }
+  sales_percent: { enabled: true, default_rate: 0.01 }   # % of personal sales, from CSV/ERP import
+  payday: 10                  # day of month salary is paid (precheck reminder 2 days before)
+  allowances: [transport, meal, phone]
+
+reports:
+  morning_at: "09:00"
+  evening_at: "18:30"
+  per_branch_to_heads: true   # each head gets only their pharmacy
+
+onboarding:
+  test_good: 80
+  test_ok: 60
+  light_red_below: 60
+  light_yellow_below: 85
+  templates:
+    pharmacist:
+      30: ["Storage & cold chain SOP", "Prescription dispensing rules", "Cash desk discipline", "Shadow mentor 5 shifts"]
+      60: ["Analog substitution test", "Customer service standards", "Pharmacovigilance basics"]
+      90: ["Solo shift review", "Final test"]
+    cashier:
+      30: ["Cash desk discipline", "Returns & refunds SOP"]
+      60: ["Customer service standards"]
+      90: ["Final test"]
+    default:
+      30: ["Company rules", "Role SOPs"]
+      60: ["Mentor review"]
+      90: ["Final review"]
+
+documents:
+  types:
+    - { code: diploma,      title: "Diploma",                 warn_days: 0 }
+    - { code: certificate,  title: "Pharmacist certificate",  warn_days: 60 }
+    - { code: med_book,     title: "Sanitary medical book",   warn_days: 30 }
+    - { code: med_check,    title: "Medical check-up",        warn_days: 30 }
+
+requests:
+  kinds: [vacation, certificate, shift_swap, sick_leave, other]
+  approver: head              # head | regional | hr
+
+recruiting:
+  sla_days_default: 21
+  sla_days_by_position: { provisor: 30, pharmacist: 21, cashier: 14 }
+  weights: { role_fit: 40, specifics: 25, communication: 15, motivation: 20 }
+  shortlist_threshold: 70
+  required_vacancy_fields: [title, branch, salary_text, schedule_text]
+
+ads:
+  budget_min: 10000
+  budget_max: 100000000
+  budget_confirm_above: 2000000
+  max_new_channels_per_day: 5
+
+# Seven decisions an agent can only REQUEST, never perform.
+human_only_actions:
+  - payroll_approve
+  - deduction_create
+  - contract_change
+  - hire
+  - fire
+  - mass_broadcast
+  - request_approve

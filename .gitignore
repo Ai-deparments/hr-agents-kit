@@ -1,0 +1,14 @@
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.session
+config/company.yaml
+backend/data/
+backend/.venv/
+**/__pycache__/
+.pytest_cache/
+web/node_modules/
+web/dist/
+*.db
