@@ -1,108 +1,159 @@
 # HR Agents Kit
 
-A white-label HR department you can deploy for any business with shifts and many branches (pharmacies, retail, clinics, restaurants):
-**7 AI agents in Telegram + a web HR panel + a team-lead cabinet and check-in Mini App**, on one database and one config file.
+**[O'zbekcha](#ozbekcha) · [Русский](#русский) · [English](README.en.md)**
 
-It started from the NOVA-KIT HR system running at a water-production plant (BioLife). It was then adapted to a pharmacy chain (Ozone).
-This kit is the generalised **default version**: the brand, branches, shifts and pay rules all live in `config/company.yaml`, so the code has no client names in it.
+> Yopiq repozitoriy / Приватный репозиторий. Muallif / Автор: Komron (CEO AI team, HR AI agents).
 
-> Private repository. Author: Komron (CEO AI team, HR AI agents).
+---
 
-## What's inside
+## O'zbekcha
 
-| Agent | Who uses it | Job |
+Smenali ishlaydigan va filiallari ko'p bo'lgan har qanday biznes (dorixona, do'kon, klinika, restoran) uchun tayyor HR bo'limi:
+- **Telegram'da 7 ta AI agent**;
+- **veb HR panel**;
+- **mudir kabineti va Keldim/Ketdim Mini App**.
+
+Hammasi bitta bazada ishlaydi va bitta fayl bilan sozlanadi.
+
+Asos — BioLife zavodida ishlayotgan NOVA-KIT HR tizimi va uni Ozone dorixonalar tarmog'iga moslashtirish tajribasi. Bu uning **standart versiyasi**: brend, filiallar, smenalar va oylik qoidalari `config/company.yaml` faylida turadi, kodda mijoz nomi yo'q.
+
+### Agentlar
+
+| Agent | Kim uchun | Vazifasi |
 |---|---|---|
-| **Hamza** — HR lead & attendance | owner, HR head, branch heads | single HR entry point; 09:00 / 18:30 attendance reports + Excel; month tabel; asks up to 3 agents |
-| **Ozoda** — onboarding | HR, heads | 30/60/90 plan from position templates, checklist, mentor, test scores, SOP lookup |
-| **Bexruz** — payroll pre-check | owner, HR head, payroll | issues before payout + amount at risk; never calculates/approves |
-| **Husayn** — analytics | owner, HR, heads | headcount, turnover (incl. "left in first 30 days"), attendance — always with base & period |
-| **Suhayl** — employee helpdesk | every employee | my shift, leave balance, my requests, my plan, my documents, rules; creates requests |
-| **Rauf** — recruiter | candidates / HR | live interview in Telegram, 4-criteria scoring, shortlist ≥ 70, vacancy drafts, SLA |
-| **Reklama** — channel ads | HR owners | registers job channels with a budget; the first message and every payment are made by a person |
+| **Hamza** — HR rahbar va davomat | egasi, HR rahbar, mudirlar | yagona kirish nuqtasi; 09:00 / 18:30 davomat hisoboti + Excel; oy tabeli; 3 tagacha agentdan so'raydi |
+| **Ozoda** — adaptatsiya | HR, mudirlar | lavozim shablonidan 30/60/90 reja, cheklist, ustoz, test ballari, SOP |
+| **Bexruz** — oylik tekshiruvi | egasi, HR rahbar, buxgalter | to'lovdan oldingi muammolar va xavf ostidagi summa; hisoblamaydi va tasdiqlamaydi |
+| **Husayn** — analitika | egasi, HR, mudirlar | shtat, kadrlar qo'nimsizligi (birinchi 30 kunda ketganlar ham), davomat — doim baza va davr bilan |
+| **Suhayl** — xodim yordamchisi | har bir xodim | smenam, ta'til qoldig'i, arizalarim, rejam, hujjatlarim, qoidalar; ariza ochadi |
+| **Rauf** — rekruter | nomzodlar / HR | Telegram'da jonli suhbat, 4 mezonli baho, ball ≥ 70 bo'lsa shortlist, vakansiya qoralamasi, SLA |
+| **Reklama** — kanallarda reklama | HR | ish kanallarini byudjet bilan qayd qiladi; birinchi xabarni va to'lovni doim inson qiladi |
 
-The **web panel** has these sections: dashboard, employees, attendance, tabel (time sheet: grid, manual edit with a required reason, Excel export, month close), payroll (formula with an explanation for every number, pre-check, approval flow), requests, approvals queue, onboarding, document expiry, recruiting, analytics, agent chat, SOP library, chat log, audit.
-The **Mini App** has two parts. Employees tap "Keldim / Ketdim" (check in / check out), and link their Telegram as "branch → name → last 4 phone digits". Team leads get a cabinet: daily "came / absent" with hours from 0.5 to 24, the team's month, and advance / penalty / bonus / warning entries, each with a required reason.
+**Veb panel bo'limlari:**
+- dashboard, xodimlar, davomat;
+- tabel: sababi ko'rsatilgan tuzatish, Excel, oyni yopish;
+- oylik: har bir raqamning formulasi, to'lovdan oldingi tekshiruv, tasdiqlash;
+- arizalar, tasdiqlar navbati, adaptatsiya, hujjat muddatlari, rekruting, analitika;
+- agentlar bilan chat, SOP bazasi, audit.
 
-## Built-in principles
+**Mini App:**
+- xodim uchun «Keldim / Ketdim» tugmalari;
+- mudir uchun Keldi/Kelmadi va soatlar (24 soatgacha), oy, avans, jarima, mukofot va ogohlantirish (sababi bilan).
 
-- **Seven decisions are made by a person only:** payroll approval, deductions, contract change, hiring, firing, mass broadcast, request approval.
-  An agent can only call `request_human_action`, which puts the request into the approvals queue.
-- **Branch scope is enforced in code.** Every service takes a `Scope`: a pharmacy head sees only their pharmacy, a regional manager only their pharmacies.
-  Tools above the user's role are never shown to the model.
-- **The data never pretends:**
-  - "not marked" is not shown as "absent";
-  - a missing check-out goes to "needs review" (8 hours are never assumed);
-  - an unknown salary is shown as `—`, not 0.
-- **Source priority for a day:** HR edit > HR leave/sick > team-lead report > self check-in. When the lead says "absent" but a check-in exists, the day becomes a `conflict` for HR to review.
-- **Audit log:** every message, tool call, report, rapport change, money entry and decision.
+### Qoidalar
 
-## Quick start (demo)
+- **7 qarorni faqat inson qabul qiladi**: oylikni tasdiqlash, ushlab qolish, shartnomani o'zgartirish, ishga olish, bo'shatish, ommaviy xabar va arizani tasdiqlash.
+- **Filial bo'yicha ruxsat kodda tekshiriladi**: mudir faqat o'z dorixonasini, hududiy menejer faqat o'z dorixonalarini ko'radi.
+- **"Belgilamagan" degani "kelmagan" emas.** Chiqish belgilanmasa, kun "tekshirish kerak" holatiga o'tadi (8 soat qo'yilmaydi). Noma'lum oylik `—` bilan ko'rsatiladi.
+- **Kun manbalarining ustuvorligi:** HR tuzatishi > ta'til/kasallik > mudir raporti > o'zi belgilash.
+
+### Tez ishga tushirish (demo)
 
 ```powershell
 cd backend
 python -m venv .venv; .venv\Scripts\pip install -r requirements.txt
-$env:DEBUG="1"; $env:DEV_TELEGRAM_ID="1001"     # 1001 = demo pharmacy head
-.venv\Scripts\python -m app.seed                 # demo data from config/company.example.yaml
+$env:DEBUG="1"; $env:DEV_TELEGRAM_ID="1001"
+.venv\Scripts\python -m app.seed
 .venv\Scripts\python -m uvicorn app.main:app --reload
-# second terminal
-cd web; npm install; npm run dev                 # http://localhost:5173  (Mini App: /m)
+# ikkinchi terminal
+cd web; npm install; npm run dev        # http://localhost:5173 , Mini App: /m
 ```
 
-Demo logins:
-- `admin / admin12345`
-- password `demo12345` for: `hr`, `buh` (payroll), `ceo`, `regional` (2 pharmacies only), `recruiter`
+Demo loginlar:
+- `admin / admin12345`;
+- `demo12345` paroli bilan: `hr`, `buh`, `ceo`, `regional`, `recruiter`.
 
-Without `ANTHROPIC_API_KEY` the agents run in **offline mode**: slash commands (`/hisobot`, `/payrollcheck`, `/tahlil`, `/onboarding`, `/menu` …) still return real data.
+`ANTHROPIC_API_KEY` bo'lmasa, agentlar buyruqlar bilan ishlaydi (`/hisobot`, `/payrollcheck`, `/tahlil`, `/menu`…).
 
-Bots: set `BOT_TOKEN_HUB` (one bot that routes to all agents) or `BOT_TOKEN_<AGENT>`, then run `python -m app.bots.main`.
+### Yangi mijozga joriy qilish
 
-## Deploy for a new client
+1. `config/company.yaml` faylini to'ldiring.
+2. `.env` faylini to'ldiring: `JWT_SECRET`, `ADMIN_PASSWORD`, bot tokenlari, `ANTHROPIC_API_KEY`.
+3. Ishga tushiring:
+   ```
+   docker compose up -d --build
+   docker compose run --rm api python -m app.seed --no-demo
+   ```
+4. 2–3 filialda 2 haftalik pilot o'tkazing.
 
-1. `cp config/company.example.yaml config/company.yaml` and fill in:
-   - brand;
-   - regions and branches;
-   - positions;
-   - schedules (fixed, 2/2, 24/48);
-   - pay rules (KPI cap, late penalty, % of sales, payday);
-   - onboarding templates, document types, request kinds, SLA by position.
-2. `cp .env.example .env`. Set `JWT_SECRET`, `ADMIN_PASSWORD`, bot tokens, Telegram IDs, `WEBAPP_URL` (HTTPS) and `ANTHROPIC_API_KEY`.
-3. `docker compose up -d --build`, then `docker compose run --rm api python -m app.seed --no-demo`.
-4. Load staff in the panel, then link people: branch heads in "Branch leads", employees through the Mini App.
-5. Pilot on 2–3 branches (one of them 24/7) for 2 weeks, with payroll calculated in parallel for one month.
+Stek va kod qoidalari: [`.claude/skills/default-stack`](.claude/skills/default-stack/SKILL.md). Yaxshilanishlar va reja: [docs/IMPROVEMENTS.md](docs/IMPROVEMENTS.md).
 
-See [docs/IMPROVEMENTS.md](docs/IMPROVEMENTS.md) for the improvements over the original system and the roadmap.
+---
 
-## Tests
+## Русский
+
+Готовый HR-отдел для любого бизнеса со сменами и множеством точек (аптеки, магазины, клиники, рестораны):
+- **7 ИИ-агентов в Telegram**;
+- **веб HR-панель**;
+- **кабинет заведующего и Mini App «Keldim / Ketdim»**.
+
+Всё работает на одной базе и настраивается одним файлом.
+
+Основа — HR-система NOVA-KIT, которая работает на заводе BioLife, и опыт её адаптации под сеть аптек Ozone. Это **дефолтная версия**: бренд, филиалы, смены и правила зарплаты лежат в `config/company.yaml`, в коде нет названия клиента.
+
+### Агенты
+
+| Агент | Для кого | Задача |
+|---|---|---|
+| **Hamza** — HR-руководитель и посещаемость | владелец, HR-директор, заведующие | единая точка входа; отчёты 09:00 / 18:30 + Excel; табель месяца; спрашивает до 3 агентов |
+| **Ozoda** — адаптация | HR, заведующие | план 30/60/90 по шаблону должности, чек-лист, наставник, тесты, SOP |
+| **Bexruz** — проверка зарплаты | владелец, HR-директор, бухгалтер | проблемы до выплаты и сумма под риском; не считает и не утверждает |
+| **Husayn** — аналитика | владелец, HR, заведующие | штат, текучесть (включая ушедших в первые 30 дней), посещаемость — всегда с базой и периодом |
+| **Suhayl** — помощник сотрудника | каждый сотрудник | моя смена, остаток отпуска, мои заявки, мой план, мои документы, правила; создаёт заявки |
+| **Rauf** — рекрутер | кандидаты / HR | живое интервью в Telegram, оценка по 4 критериям, shortlist от 70 баллов, черновики вакансий, SLA |
+| **Реклама** — каналы | HR | регистрирует каналы с бюджетом; первое сообщение и оплату всегда делает человек |
+
+**Разделы веб-панели:**
+- дашборд, сотрудники, посещаемость;
+- табель: правка с причиной, Excel, закрытие месяца;
+- зарплата: формула у каждой цифры, проверка перед выплатой, утверждение;
+- заявки, очередь одобрений, адаптация, сроки документов, рекрутинг, аналитика;
+- чат с агентами, база SOP, аудит.
+
+**Mini App:**
+- для сотрудника кнопки «Keldim / Ketdim»;
+- для заведующего Keldi/Kelmadi и часы (до 24), месяц, аванс, штраф, премия и предупреждение (с причиной).
+
+### Принципы
+
+- **7 решений принимает только человек**: утверждение зарплаты, удержание, изменение договора, найм, увольнение, массовая рассылка и одобрение заявки.
+- **Доступ по филиалу проверяется в коде**: заведующий видит только свою аптеку, региональный менеджер — только свои аптеки.
+- **«Не отметился» ≠ «не пришёл».** Если нет отметки ухода, день уходит «на проверку» (8 часов не подставляются). Неизвестная зарплата показывается как `—`.
+- **Приоритет источников дня:** правка HR > отпуск/больничный > рапорт заведующего > самоотметка.
+
+### Быстрый старт (демо)
+
+```powershell
+cd backend
+python -m venv .venv; .venv\Scripts\pip install -r requirements.txt
+$env:DEBUG="1"; $env:DEV_TELEGRAM_ID="1001"
+.venv\Scripts\python -m app.seed
+.venv\Scripts\python -m uvicorn app.main:app --reload
+# второй терминал
+cd web; npm install; npm run dev        # http://localhost:5173 , Mini App: /m
+```
+
+Демо-логины:
+- `admin / admin12345`;
+- с паролем `demo12345`: `hr`, `buh`, `ceo`, `regional`, `recruiter`.
+
+Без `ANTHROPIC_API_KEY` агенты работают по командам (`/hisobot`, `/payrollcheck`, `/tahlil`, `/menu`…).
+
+### Запуск у нового клиента
+
+1. Заполните `config/company.yaml`.
+2. Заполните `.env`: `JWT_SECRET`, `ADMIN_PASSWORD`, токены ботов, `ANTHROPIC_API_KEY`.
+3. Запустите:
+   ```
+   docker compose up -d --build
+   docker compose run --rm api python -m app.seed --no-demo
+   ```
+4. Проведите пилот на 2–3 филиалах в течение 2 недель.
+
+Стек и правила кода: [`.claude/skills/default-stack`](.claude/skills/default-stack/SKILL.md). Улучшения и план развития: [docs/IMPROVEMENTS.md](docs/IMPROVEMENTS.md).
+
+### Tests / Тесты
 
 ```powershell
 cd backend; .venv\Scripts\python -m pytest -q
-```
-
-The tests cover:
-- overnight 24-hour shifts;
-- missing check-out going to review;
-- unmarked ≠ absent, and source priority / conflicts;
-- personal-schedule lateness;
-- branch scope, Telegram roles, and tools hidden above the user's role;
-- self-only onboarding plan;
-- leave balance, and approval landing in the tabel;
-- payroll formula and amount hiding;
-- the human-only payroll flow;
-- interview scoring and banned questions;
-- the small-group % rule;
-- offline agents and routing;
-- API permissions;
-- Mini App check-in.
-
-## Layout
-
-```
-config/company.example.yaml   the only place a client is configured
-backend/app/
-  models.py  rbac.py  auth.py  config.py  seed.py
-  services/  attendance · schedules · payroll · people · onboarding · analytics · recruiting · interview · reports · notifications
-  agents/    registry.py (agents) · tools.py (role-gated tools) · runtime.py (Claude tool loop + offline mode) · personas/*.md
-  api/       panel.py · miniapp.py · agents.py
-  bots/      main.py (aiogram: per-agent or hub bot, scheduler)
-web/          React + Vite panel and Mini App
 ```
