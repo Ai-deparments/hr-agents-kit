@@ -52,6 +52,21 @@ def test_miniapp_dev_checkin_and_lead():
     assert c.get("/api/miniapp/lead/branches", headers=h).status_code == 403  # an employee is not a lead
 
 
+def test_rauf_panel_and_permissions():
+    h = _login("recruiter", "demo12345")
+    d = c.get("/api/rauf/dashboard", headers=h).json()
+    assert d["candidates"] >= 1 and set(d["funnel"]) == {"new", "shortlist", "hired", "rejected"}
+    assert set(c.get("/api/rauf/pipeline", headers=h).json()) == {"new", "shortlist", "hired", "rejected"}
+    integ = c.get("/api/rauf/integrations", headers=h).json()
+    assert all(set(i) <= {"name", "connected", "note"} for i in integ)  # never key values
+    assert c.get("/api/rauf/dashboard", headers=_login("buh", "demo12345")).status_code == 403
+
+
+def test_rauf_miniapp_hr_only():
+    tok = c.post("/api/miniapp/auth", json={"init_data": ""}).json()["token"]  # dev user 2001 = employee
+    assert c.get("/api/miniapp/rauf/candidates", headers={"Authorization": f"Bearer {tok}"}).status_code == 403
+
+
 def test_agents_chat_panel():
     h = _login("admin", "admin12345")
     r = c.post("/api/agents/husayn/chat", json={"text": "/shtat"}, headers=h)

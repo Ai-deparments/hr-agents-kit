@@ -43,11 +43,11 @@ def _answer_sync(agent: str, tg_id: int, text: str) -> str:
         return run_agent(db, agent, scope, text, user_key=f"tg:{tg_id}")
 
 
-def miniapp_keyboard() -> ReplyKeyboardMarkup | None:
+def miniapp_keyboard(path: str = "/m", label: str = "🕘 Davomat") -> ReplyKeyboardMarkup | None:
     url = settings().webapp_url
     if not url.startswith("https://"):
         return None  # Telegram requires HTTPS for Mini Apps
-    return ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="🕘 Davomat", web_app=WebAppInfo(url=f"{url}/m"))]], resize_keyboard=True)
+    return ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text=label, web_app=WebAppInfo(url=f"{url}{path}"))]], resize_keyboard=True)
 
 
 def agent_router(agent: str | None) -> Router:
@@ -66,6 +66,7 @@ def agent_router(agent: str | None) -> Router:
             with SessionLocal() as db:
                 if not scope_for_telegram(db, m.from_user.id).at_least("hr_head"):
                     return await start_interview(m)
+            kb = miniapp_keyboard("/m/rauf", "👥 Nomzodlar")  # Rauf HR Mini App: candidates + decisions
         await m.answer(f"👋 {cfg('company.name')} · {name}\nWrite your question in plain words. /id — your Telegram ID.",
                        reply_markup=kb)
 

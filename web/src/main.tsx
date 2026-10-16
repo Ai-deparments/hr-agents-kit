@@ -4,6 +4,8 @@ import { api } from "./api";
 import { Lang, LangCtx } from "./i18n";
 import MiniApp from "./miniapp/MiniApp";
 import Panel from "./panel/Panel";
+import RaufMini from "./rauf/RaufMini";
+import RaufPanel from "./rauf/RaufPanel";
 import "./styles.css";
 
 function Root() {
@@ -25,10 +27,11 @@ function Root() {
       if (!stored && c?.company?.default_language) setLangState(c.company.default_language);
     }).catch(() => {});
   }, []);
-  const isMini = location.pathname === "/m" || location.pathname.startsWith("/m/");
+  const p = location.pathname;
+  const isMini = p === "/m" || p.startsWith("/m/");
   return (
     <LangCtx.Provider value={{ lang, setLang }}>
-      {isMini ? <MiniApp /> : <Panel />}
+      {p.startsWith("/m/rauf") ? <RaufMini /> : isMini ? <MiniApp /> : p.startsWith("/rauf") ? <RaufPanel /> : <Panel />}
     </LangCtx.Provider>
   );
 }

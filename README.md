@@ -40,6 +40,19 @@ Asos — BioLife zavodida ishlayotgan NOVA-KIT HR tizimi va uni Ozone dorixonala
 - xodim uchun «Keldim / Ketdim» tugmalari;
 - mudir uchun Keldi/Kelmadi va soatlar (24 soatgacha), oy, avans, jarima, mukofot va ogohlantirish (sababi bilan).
 
+**Rauf'ning alohida paneli (`/rauf`)** — rekruter uchun o'z kirishi bilan:
+- dashboard: ochiq vakansiyalar, nomzodlar, o'rtacha ball, yopish muddati, SLA svetofori;
+- voronka: yangi → shortlist → ishga olindi / rad etildi; manbalar bo'yicha (bot, hh, forma);
+- pipeline (kanban), vakansiyalar va nomzodlar, arxiv;
+- kanallardagi reklama bitimlari;
+- integratsiyalar holati (kalit qiymatlari ko'rsatilmaydi).
+
+Hammasi filial bo'yicha ruxsat bilan cheklangan.
+
+**Rauf Mini App (`/m/rauf`)** — Rauf botida faqat HR uchun ochiladi:
+- nomzodlar ballari bilan;
+- tugmalar: Shortlist / Ishga olindi / Rad etish. Qarorni faqat inson qabul qiladi.
+
 ### Qoidalar
 
 - **7 qarorni faqat inson qabul qiladi**: oylikni tasdiqlash, ushlab qolish, shartnomani o'zgartirish, ishga olish, bo'shatish, ommaviy xabar va arizani tasdiqlash.
@@ -113,6 +126,19 @@ Stek va kod qoidalari: [`.claude/skills/default-stack`](.claude/skills/default-s
 **Mini App:**
 - для сотрудника кнопки «Keldim / Ketdim»;
 - для заведующего Keldi/Kelmadi и часы (до 24), месяц, аванс, штраф, премия и предупреждение (с причиной).
+
+**Отдельная панель Rauf (`/rauf`)** — для рекрутера, со своим входом:
+- дашборд: открытые вакансии, кандидаты, средний балл, срок закрытия, светофор SLA;
+- воронка: новый → shortlist → принят / отказ; по источникам (бот, hh, форма);
+- pipeline (канбан), вакансии и кандидаты, архив резюме;
+- сделки рекламного агента;
+- состояние интеграций (значения ключей не показываются).
+
+Всё ограничено доступом по филиалам.
+
+**Mini App Rauf (`/m/rauf`)** — открывается в боте Rauf только для HR:
+- кандидаты с баллами;
+- кнопки Shortlist / Ishga olindi / Rad etish. Решение принимает только человек.
 
 ### Принципы
 

@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from .api import agents, miniapp, panel
+from .api import agents, miniapp, panel, rauf
 from .config import settings
 from .db import init_db
 
@@ -32,6 +32,8 @@ app.add_middleware(CORSMiddleware, allow_origins=[settings().webapp_url, "http:/
 app.include_router(panel.router)
 app.include_router(miniapp.router)
 app.include_router(agents.router)
+app.include_router(rauf.router)
+app.include_router(rauf.mini)
 
 
 @app.get("/api/health")

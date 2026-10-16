@@ -166,6 +166,17 @@ def test_interview_scoring_rules():
     assert not recruiting.find_banned("Do you have a valid pharmacist certificate?")
 
 
+def test_new_candidate_with_high_score_goes_to_shortlist():
+    from app.models import Candidate
+    c = Candidate(full_name="X")  # not flushed: status is still None
+    good = {k: {"score": 90, "comment": "ok"} for k in ("role_fit", "specifics", "communication", "motivation")}
+    recruiting.apply_score(None, c, good)
+    assert c.status == "shortlist"
+    c.status = "rejected"
+    recruiting.apply_score(None, c, good)
+    assert c.status == "rejected", "scoring never overrides a human decision"
+
+
 def test_small_group_percent_rule():
     assert analytics.pct(1, 3).endswith("(% unreliable)")
     assert analytics.pct(2, 8) == "2 of 8"

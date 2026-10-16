@@ -81,7 +81,7 @@ def score_candidate(breakdown: dict) -> dict:
 def apply_score(db: Session, cand: Candidate, breakdown: dict) -> Candidate:
     res = score_candidate(breakdown)
     cand.breakdown, cand.score, cand.label = breakdown, res["score"], res["label"]
-    if cand.status == "new":
+    if cand.status in (None, "new"):  # None = not flushed yet (column default not applied)
         cand.status = res["status"]  # only new -> shortlist; never hired/rejected
     return cand
 

@@ -175,5 +175,13 @@ label.field > * { font-size: 14px; font-weight: 400; color: var(--ink); }
 .actions4 button { padding: 16px 8px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); font-weight: 800; cursor: pointer; }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 80px; background: var(--ink); color: var(--surface); padding: 10px 16px; border-radius: 12px; font-weight: 600; z-index: 60; max-width: calc(100% - 32px); }
 
+/* ---------------- Rauf recruiter panel ---------------- */
+.kanban { display: grid; grid-template-columns: repeat(4, minmax(220px, 1fr)); gap: 12px; overflow-x: auto; padding-bottom: 6px; }
+.kcol { background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; padding: 10px; display: grid; gap: 8px; align-content: start; min-height: 120px; }
+.kcard { text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px; display: grid; gap: 4px; cursor: pointer; font: inherit; color: inherit; }
+.kcard:hover { border-color: var(--primary); }
+.bar { height: 8px; border-radius: 99px; background: var(--surface-2); overflow: hidden; margin-top: 4px; }
+.bar span { display: block; height: 100%; background: var(--primary); border-radius: 99px; }
+
 .agent-grid { grid-template-columns: minmax(0, 240px) minmax(0, 1fr); align-items: start; }
 @media (max-width: 700px) { .agent-grid { grid-template-columns: 1fr; } }

@@ -23,6 +23,7 @@ export default function Recruiting() {
       <Err e={err || vac.error || cands.error} />
       <div className="card">
         <div className="row" style={{ marginBottom: 10 }}><h2 style={{ margin: 0 }}>Vacancies</h2><span className="spacer" />
+          {!location.pathname.startsWith("/rauf") && <a className="btn" href="/rauf">Rauf panel ↗</a>}
           {write && <button className="btn primary" onClick={() => setDrafting(true)}>+ Draft vacancy</button>}</div>
         <div className="table-wrap"><table>
           <thead><tr><th /><th>Title</th><th>Branch</th><th>Salary</th><th>Schedule</th><th>Status</th><th className="num">SLA</th><th /></tr></thead>

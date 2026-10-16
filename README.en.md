@@ -23,6 +23,19 @@ This kit is the generalised **default version**: the brand, branches, shifts and
 The **web panel** has these sections: dashboard, employees, attendance, tabel (time sheet: grid, manual edit with a required reason, Excel export, month close), payroll (formula with an explanation for every number, pre-check, approval flow), requests, approvals queue, onboarding, document expiry, recruiting, analytics, agent chat, SOP library, chat log, audit.
 The **Mini App** has two parts. Employees tap "Keldim / Ketdim" (check in / check out), and link their Telegram as "branch → name → last 4 phone digits". Team leads get a cabinet: daily "came / absent" with hours from 0.5 to 24, the team's month, and advance / penalty / bonus / warning entries, each with a required reason.
 
+**Rauf has his own recruiter panel at `/rauf`** (role recruiter, same login). It contains:
+- a dashboard with open vacancies, candidates, average score, days to close and SLA lights;
+- the funnel by stage and by source;
+- a kanban pipeline;
+- vacancies and candidates;
+- the CV archive;
+- channel-ad deals;
+- integration status, without key values.
+
+Everything is limited by branch scope.
+
+**Rauf's HR Mini App** at `/m/rauf` opens from Rauf's bot, for HR Telegram IDs only. It shows candidates with their scores and the Shortlist / Hired / Reject buttons; a person makes every decision.
+
 ## Built-in principles
 
 - **Seven decisions are made by a person only:** payroll approval, deductions, contract change, hiring, firing, mass broadcast, request approval.

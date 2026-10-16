@@ -25,9 +25,18 @@ class AuthIn(BaseModel):
 @router.post("/auth")
 def auth(body: AuthIn, db: Session = Depends(get_db)):
     s = settings()
-    token = s.bot_token("hamza") or s.hub_bot_token
-    if body.init_data and token:
-        tg = verify_init_data(body.init_data, token)
+    # the Mini App may be opened from Hamza's bot, Rauf's bot or the hub bot — accept a signature from any of ours
+    tokens = [t for t in (s.bot_token("hamza"), s.bot_token("rauf"), s.hub_bot_token) if t]
+    if body.init_data and tokens:
+        tg = None
+        for t in tokens:
+            try:
+                tg = verify_init_data(body.init_data, t)
+                break
+            except HTTPException:
+                continue
+        if tg is None:
+            raise HTTPException(401, "Bad Telegram signature")
         tg_id = int(tg["id"])
     elif s.debug and s.dev_telegram_id:
         tg_id = s.dev_telegram_id  # local development in a normal browser
