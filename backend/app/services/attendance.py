@@ -47,7 +47,7 @@ class DayResult:
     employee_id: int
     day: str
     status: str            # present | late | on_shift | absent | leave | unmarked | off | needs_review | conflict | not_employed
-    source: str | None     # hr | leave | lead | telegram | turnstile
+    source: str | None     # hr | leave | lead | telegram | turnstile | timepay | camera
     check_in: str | None = None
     check_out: str | None = None
     worked_hours: float | None = None
@@ -99,6 +99,12 @@ def _worked(emp: Employee, t_in: datetime, t_out: datetime) -> float:
     return round(max(hours, 0), 2)
 
 
+def _prefer_human(events: list[AttendanceEvent]) -> list[AttendanceEvent]:
+    """Camera marks only fill a gap: any non-camera mark of the same kind wins."""
+    human = [e for e in events if e.source != "camera"]
+    return human or events
+
+
 def compute_day(emp: Employee, d: date, data: AttendanceData, now: datetime | None = None) -> DayResult:
     now = now or datetime.now()
     planned = sch.planned_hours(emp, d)
@@ -134,17 +140,18 @@ def compute_day(emp: Employee, d: date, data: AttendanceData, now: datetime | No
             r.status, r.source, r.leave_kind = "leave", "leave", a.kind
             return r
 
-    # self check-in (used by 3 and 4)
-    ins = [e for e in data.events.get(emp.id, []) if e.kind == "in" and e.ts.date() == d]
+    # self check-in / time system / AI camera (used by 3 and 4). A human mark beats a camera mark of the same kind.
+    evs = data.events.get(emp.id, [])
+    ins = _prefer_human([e for e in evs if e.kind == "in" and e.ts.date() == d])
     t_in = ins[0].ts if ins else None
     t_out = None
     src_events = ins[0].source if ins else None
     if t_in:
         # the shift ends at the last check-out before the next shift's check-in (or the 30h window)
-        nxt = [e.ts for e in data.events.get(emp.id, []) if e.kind == "in" and e.ts.date() > d]
+        nxt = [e.ts for e in evs if e.kind == "in" and e.ts.date() > d]
         limit = min([t_in + sch.SHIFT_WINDOW] + nxt)
-        outs = [e.ts for e in data.events.get(emp.id, []) if e.kind == "out" and t_in < e.ts <= limit]
-        t_out = outs[-1] if outs else None
+        outs = _prefer_human([e for e in evs if e.kind == "out" and t_in < e.ts <= limit])
+        t_out = outs[-1].ts if outs else None
 
     # 3. Team-lead report
     rep = data.reports.get((emp.id, d))

@@ -36,6 +36,8 @@ class Settings:
     claude_effort: str = field(default_factory=lambda: os.getenv("CLAUDE_EFFORT", "low"))
     claude_fallbacks: bool = field(default_factory=lambda: os.getenv("CLAUDE_FALLBACKS", "1") == "1")
     agent_api_key: str = field(default_factory=lambda: os.getenv("AGENT_API_KEY", ""))
+    # AI camera webhook: HMAC secret shared with the camera service. Empty = the endpoint answers 503.
+    camera_webhook_secret: str = field(default_factory=lambda: os.getenv("CAMERA_WEBHOOK_SECRET", ""))
 
     def bot_token(self, agent: str) -> str:
         return os.getenv(f"BOT_TOKEN_{agent.upper()}", "")

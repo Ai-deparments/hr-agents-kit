@@ -628,3 +628,42 @@ class AuditLog(Base):
     action: Mapped[str] = mapped_column(String(60))
     target: Mapped[str | None] = mapped_column(String(120))
     details: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+# ---------------- AI camera (signed webhook -> attendance) ----------------
+
+class CameraDelivery(Base):
+    """One row per webhook delivery id: a retried delivery is never processed twice. Photos are stripped before saving."""
+    __tablename__ = "camera_deliveries"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    delivery_id: Mapped[str] = mapped_column(String(80), unique=True)
+    event: Mapped[str] = mapped_column(String(30))
+    received_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class CameraEvent(Base):
+    """A person seen by the camera. Unmatched / ambiguous names are kept for HR, never guessed."""
+    __tablename__ = "camera_events"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    delivery_id: Mapped[str] = mapped_column(String(80), index=True)
+    kind: Mapped[str] = mapped_column(String(10))  # arrived | left
+    ts: Mapped[datetime] = mapped_column(DateTime)
+    day: Mapped[date] = mapped_column(Date, index=True)
+    raw_name: Mapped[str] = mapped_column(String(160))
+    branch_code: Mapped[str | None] = mapped_column(String(20))
+    match: Mapped[str] = mapped_column(String(10))  # matched | unmatched | ambiguous
+    employee_id: Mapped[int | None] = mapped_column(ForeignKey("employees.id"), index=True)
+    applied: Mapped[bool] = mapped_column(Boolean, default=False)  # became / moved an attendance mark
+    note: Mapped[str | None] = mapped_column(String(120))
+
+
+class CameraVisit(Base):
+    """Visitors per hour (counts only, no people)."""
+    __tablename__ = "camera_visits"
+    __table_args__ = (UniqueConstraint("day", "hour", "branch_code"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    day: Mapped[date] = mapped_column(Date, index=True)
+    hour: Mapped[int] = mapped_column(Integer)
+    branch_code: Mapped[str | None] = mapped_column(String(20))
+    count: Mapped[int] = mapped_column(Integer, default=0)

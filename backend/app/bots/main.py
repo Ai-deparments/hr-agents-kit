@@ -822,7 +822,11 @@ async def send_reports(sender: Sender, kind: str) -> None:
         if kind == "evening" and (d + timedelta(days=1)).day == 1:
             tabel = (f"tabel-{d:%Y-%m}.xlsx", reports.tabel_excel(db, SYSTEM, d.strftime("%Y-%m")))
         docs = reports.documents_digest(db, SYSTEM, 30) if kind == "morning" and d.weekday() == 0 else None
+        # names the camera could not match: once a day (full day seen), private chats only — never the group
+        unknown = reports.camera_unmatched_text(db, d) if kind == "evening" else None
     await sender.report(text, (f"davomat-{d}.xlsx", xlsx), rich, kind="attendance")
+    if unknown:
+        await sender.to_ids(sender.management_ids(), unknown)
     for tg, t in per_branch:
         await sender.to_ids([tg], t)
     if tabel:

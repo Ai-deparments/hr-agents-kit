@@ -21,6 +21,7 @@ import Broadcast from "./Broadcast";
 import Kpi from "./Kpi";
 import HhSearch from "./HhSearch";
 import Materials from "./Materials";
+import Camera from "./Camera";
 import { BotAccess, PendingUsers, UsersPage } from "./Users";
 import { Ic } from "../icons";
 
@@ -33,6 +34,7 @@ const PAGES: Page[] = [
   { key: "employees", sec: "secPeople", icon: "team", perm: "hr.read", el: () => <Employees /> },
   { key: "structure", sec: "secPeople", icon: "tree", perm: "hr.read", el: () => <Structure /> },
   { key: "attendance", sec: "secPeople", icon: "clock", perm: "hr.read", el: () => <Attendance /> },
+  { key: "camera", sec: "secPeople", icon: "camera", perm: "hr.read", el: () => <Camera /> },
   { key: "tabel", sec: "secPeople", icon: "grid", perm: "hr.read", el: () => <Tabel /> },
   { key: "requests", sec: "secPeople", icon: "file", perm: "hr.read", el: () => <Requests /> },
   { key: "approvals", sec: "secPeople", icon: "check", perm: "hr.read", el: () => <Approvals /> },

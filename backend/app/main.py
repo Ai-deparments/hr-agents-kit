@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from .api import agents, docs, engagement, hh, hiring, kpi, materials, miniapp, nudges, org, panel, rauf, vacancies
+from .api import agents, camera, docs, engagement, hh, hiring, kpi, materials, miniapp, nudges, org, panel, rauf, vacancies
 from .config import settings
 from .db import init_db
 
@@ -66,6 +66,7 @@ app.include_router(rauf.router)
 app.include_router(rauf.mini)
 app.include_router(engagement.router)
 app.include_router(engagement.mini)
+app.include_router(camera.router)
 
 
 @app.get("/api/health")

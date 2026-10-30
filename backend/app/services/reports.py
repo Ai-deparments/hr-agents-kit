@@ -66,6 +66,37 @@ def _pct(a: int, b: int) -> str:
     return f"{round(100 * a / b)}%" if b else "—"
 
 
+def _camera(db: Session, scope: Scope, d: date) -> dict | None:
+    """Camera facts for the day (counts only). None when the camera is off and sent nothing."""
+    from . import camera
+    c = camera.day_summary(db, scope, d)
+    if not c["configured"] and not c["arrived"] and not c["unmatched_count"]:
+        return None
+    return c
+
+
+def camera_line(db: Session, scope: Scope, d: date, md: bool = False) -> str | None:
+    """One count line for group reports. Names never go here (see camera_unmatched_text)."""
+    c = _camera(db, scope, d)
+    if not c:
+        return None
+    b = (lambda x: f"**{x}**") if md else (lambda x: f"<b>{x}</b>")
+    line = f"Kamera: keldi {b(c['arrived'])} · kechikdi {b(c['late'])}"
+    if c["unmatched_count"]:
+        line += f" · tanilmadi {b(c['unmatched_count'])}"
+    return f"{tg.me('eyes') if md else tg.e('eyes')} {line}"
+
+
+def camera_unmatched_text(db: Session, d: date) -> str | None:
+    """Names the camera sent that matched no single employee — private chats of whole-network leaders only."""
+    from . import camera
+    c = camera.day_summary(db, Scope("system", "owner", None, True), d)
+    if not c["unmatched"]:
+        return None
+    return (f"{tg.e('eyes')} <b>Kamera tanimagan ismlar — {d:%d.%m}</b>\n" + "\n".join(_esc(n) for n in c["unmatched"][:30])
+            + "\n<i>Ismni xodim kartasida yoki kamera xizmatida tuzating — taxmin qilib bog'lanmaydi.</i>")
+
+
 def morning_md(db: Session, scope: Scope, d: date | None = None, now: datetime | None = None) -> str:
     """Rich message for a phone: heading, key lines, short lists (no wide tables)."""
     d = d or date.today()
@@ -95,6 +126,8 @@ def morning_md(db: Session, scope: Scope, d: date | None = None, now: datetime |
     if s.get("untracked"):
         out += [f"#### {E('eyes')} TimePay'da 30 kundan beri belgi yo'q (foizga kirmaydi): "
                 + ", ".join(M(n) for n in s["untracked"][:10])]
+    if cam := camera_line(db, scope, d, md=True):
+        out.append(cam)
     out += [f"#### {E('idea')} *Belgilamagan — kelmagan degani emas. Batafsil — Excel faylda.*"]
     return "\n\n".join(out)
 
@@ -116,6 +149,8 @@ def evening_md(db: Session, scope: Scope, d: date | None = None, now: datetime |
     if top:
         out += [f"### {E('trophy')} Eng ko'p ishlaganlar", "\n".join(
             f"- {M(r['full_name'])} — {str(r['worked_hours']).replace('.', ',')} soat" for r in top)]
+    if cam := camera_line(db, scope, d, md=True):
+        out.append(cam)
     out += [f"#### {E('idea')} *Batafsil — Excel faylda.*"]
     return "\n\n".join(out)
 
@@ -145,6 +180,8 @@ def morning_text(db: Session, scope: Scope, d: date | None = None, now: datetime
     if unmarked:
         parts.append(f"<blockquote expandable>{tg.e('user')} <b>Belgilamaganlar</b>\n" +
                      "\n".join(_esc(r["full_name"]) for r in unmarked) + "</blockquote>")
+    if cam := camera_line(db, scope, d):
+        parts.append(cam)
     parts.append(f"{tg.e('idea')} <i>Belgilamagan — kelmagan degani emas. Manba: {_esc(cfg('attendance.source', 'telegram'))}</i>")
     return "\n\n".join(parts)
 
@@ -170,6 +207,8 @@ def evening_text(db: Session, scope: Scope, d: date | None = None, now: datetime
     if top:
         parts.append(f"<blockquote expandable>{tg.e('trophy')} <b>Eng ko'p ishlaganlar</b>\n" + "\n".join(
             f"{_esc(r['full_name'])} — {str(r['worked_hours']).replace('.', ',')} soat" for r in top) + "</blockquote>")
+    if cam := camera_line(db, scope, d):
+        parts.append(cam)
     parts.append(f"{tg.e('idea')} <i>Batafsil — ilovadagi Excel hisobotda.</i>")
     return "\n\n".join(parts)
 

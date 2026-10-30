@@ -60,6 +60,12 @@ attendance:
   default_radius_m: 150
   verify_checkout: false
 
+camera:                       # AI camera -> attendance: signed webhook POST /api/webhooks/camera
+                              # on only when CAMERA_WEBHOOK_SECRET is set in .env (otherwise the endpoint answers 503)
+  timestamp_window_s: 300     # X-Timestamp must be within ±5 min
+  max_body_kb: 512
+  match_by_branch: true       # when an event carries branch_code, match the name only inside that branch
+
 labor:                        # Labor Code of Uzbekistan (ZRU-798) — confirm with the client's lawyer
   annual_leave_min_days: 21
   leave_after_months: 6
