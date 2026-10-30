@@ -35,13 +35,41 @@
 | **Golden evals** (`backend/evals/golden.yaml`) | Routing, role refusals and banned interview questions, run in CI. They already caught 2 gaps in the question filter |
 | **Rauf recruiter panel + HR Mini App** | `/rauf` and `/m/rauf` |
 
+## v0.3.1 (2026-10-30)
+
+Ported from the v0.2-based branch into the v0.3 architecture; the gap analysis is in [V03_GAP.md](V03_GAP.md).
+
+| Feature | Why |
+|---|---|
+| **AI camera webhook** (`POST /api/webhooks/camera`, `services/camera.py`) | Camera services post arrivals / leaves / hourly visitor counts / a day timesheet. HMAC over `<X-Timestamp>.<body>`, ±5 min, body cap, `X-Delivery-Id` processed once. Exact name match only (unmatched / ambiguous kept, never guessed); earliest arrival / latest leave; any human or time-system mark wins; photo / base64 fields stripped before saving. Group report: one count line; unmatched names only privately |
+| **Discipline rules** (`discipline.rules`, Panel → Discipline rules) | Rules (N warnings, then a fine; window month / all time / per case) come from config; admins edit texts and amounts with before/after audit; a person applies a rule, which writes a warning or penalty entry with a snapshot amount (blocked in a closed month). Read-only `discipline_rules` tool |
+| **Vacancy studio** (`services/ad_check.py`, `services/vacancies.py`) | Company facts (admin) are the only extra facts; 2 agent variants with template fallback; pick in words (code first, the model may only label 1 / 2); every free text passes the checker; publish only on the exact confirm word (bot and agent tool); "task for the agent" queue with a human Apply; channel post without an inline button |
+| **Invite / Reject with preview** (`services/hiring.py`, `services/outbox.py`) | Exact message preview, 409 if it changed; outbox rows claimed before sending (at most once) and deduped; free-text booking mapped only to offered slots; atomic conditional-UPDATE booking; move / cancel by text; reminders the day before at 18:00 and 1 h before |
+| **Hire → onboarding handoff** (`OnboardingHandoff`) | "Hired" in the panel / Mini App now leads to a waiting list: one click = card + 30/60/90 plan + course; dismiss with a reason; waiting count in the onboarding topic report |
+| **Tabel-close reminder, weekly signals** | From the 1st until last month's tabel is closed (HR heads, counts only). Per-branch lateness / confirmed absences / early leaves vs the previous 4 weeks (≥ 3 and ≥ 2×): group count only, details privately; HR agent tool + Analytics card |
+
+### Upgrade from v0.3
+
+1. Pull, then rebuild: `docker compose up -d --build` (or restart `uvicorn` and `python -m app.bots.main`).
+2. Schema: on start `init_db()` creates the new tables (`camera_*`, `discipline_*`, `ad_variants`, `agent_jobs`,
+   `onboarding_handoffs`) and adds the new columns (`vacancies.ad_custom`, `outbox.claimed_at` / `dedupe_key`,
+   `interview_slots.reminded_day` / `reminded_hour` / `booked_at`). Nothing to run by hand; on Postgres the new
+   `outbox.dedupe_key` column has no index on an upgraded database — add `CREATE INDEX ix_outbox_dedupe_key ON outbox (dedupe_key)` if the outbox is large.
+3. Seed the discipline rules: `docker compose run --rm api python -m app.seed --no-demo` (idempotent; edits made in the panel are kept).
+4. Config (`config/company.yaml`, copy from the example): `camera.*`, `discipline.rules`, `recruiting.publish_confirm_words`,
+   `recruiting.interviews.*`, `payroll.tabel_close_reminder`, `reports.weekly_signals`.
+5. Env: `CAMERA_WEBHOOK_SECRET` (random, ≥ 32 chars) only if an AI camera will post to the kit; without it the endpoint answers 503.
+6. Behaviour changes: Reject in the panel now sends the candidate a polite message (preview first); a booked candidate who
+   writes to the bot gets the booking repeated (or moves / cancels it) instead of silence; interview reminders moved from
+   ~2 h before to the day before at 18:00 + 1 h before; already-booked slots from v0.3 get the 1 h reminder only.
+
 ## Next (roadmap)
 
 Ranked by value for effort, from the 2026-10 research:
 
 1. **Shift-swap marketplace.** An employee posts a shift, an eligible colleague (same role, no rest-time or 120 h conflict) claims it, the head approves with one tap, and the timesheet updates.
 2. **SOP quiz.** After "read", 3–5 questions as native Telegram quiz polls; store the score next to the receipt.
-3. **Interview scheduling.** After the shortlist the candidate picks a slot, with reminders 24 h and 2 h before; on a no-show the bot offers the next candidate.
+3. **Interview no-shows.** (Scheduling and reminders are done in v0.3.1.) On a no-show the bot offers the slot to the next candidate.
 4. **Webhook mode for bots.** Use `secret_token` checked through `X-Telegram-Bot-Api-Secret-Token`, instead of polling.
 5. **RAG over SOPs.** pgvector, answers quote the SOP id and section, "I don't know" below the threshold, role filter at retrieval.
 6. **LLM observability.** Self-hosted Langfuse or OpenTelemetry: cost and latency per agent, plus nightly golden runs against Claude.

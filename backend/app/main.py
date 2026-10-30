@@ -27,7 +27,7 @@ async def lifespan(_: FastAPI):
 
 
 _dbg = settings().debug
-app = FastAPI(title="HR Agents Kit", version="0.2.0", lifespan=lifespan,
+app = FastAPI(title="HR Agents Kit", version="0.3.1", lifespan=lifespan,
               docs_url="/docs" if _dbg else None, redoc_url=None, openapi_url="/openapi.json" if _dbg else None)
 app.add_middleware(CORSMiddleware, allow_origins=[settings().webapp_url] + (["http://localhost:5173"] if _dbg else []),
                    allow_methods=["GET", "POST", "PATCH", "DELETE"], allow_headers=["Authorization", "Content-Type", "X-Api-Key"])

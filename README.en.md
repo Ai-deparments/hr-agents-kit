@@ -60,6 +60,17 @@ Everything is limited by branch scope.
 - **Panel:** users, bot access requests (strangers are ignored by the bot), role builder, departments.
 - **More accurate attendance:** checked in without check-out counts as present; people with no marks for 30 days are listed separately and excluded from the rate.
 
+### New in v0.3.1
+
+- **AI camera → attendance.** A signed webhook (`POST /api/webhooks/camera`, HMAC, 5-minute window, a retried delivery counts once). The earliest arrival and the latest leave of the day are kept; a human mark (check-in, team lead, HR edit) always wins; photos are never stored; a name is linked only when it matches exactly one employee, the rest are kept for HR. A camera line in the attendance report (counts only in the group) and a read-only "AI camera" page.
+- **Discipline rules.** The list lives in `company.yaml`; only an admin edits texts and amounts in the panel (audited before/after). A person applies a rule: N warnings first, then a fine; a recorded fine keeps its amount even if the rule changes later.
+- **Vacancy studio.** A company facts block (approved by an admin) — the agent writes only from it and the vacancy card. The agent writes 2 variants; HR picks in words ("2", "the second one") or says what to change. Every text is checked: phones/links cut, numbers only from the sources, age only "18+", no gender/appearance/nationality/religion requirements. A "task for the agent" queue in the panel; a person applies the result. Publishing needs the exact confirm word ("e'lon qil" / "publish"); "don't publish" never publishes.
+- **Invite / Reject with a preview.** HR sees the exact message the candidate gets; it is sent once (outbox). The candidate writes a time freely ("10:30", "12.11 10:30", in words) — the model may only map it to an offered slot; booking is atomic; moving / cancelling works in words too. Reminders the day before at 18:00 and 1 h before.
+- **Hired → onboarding.** A candidate marked hired in the panel appears in Onboarding as waiting: one click creates the card + 30/60/90 plan + course; dismiss needs a reason. The onboarding report shows the waiting count.
+- **Reports.** Payroll: from the 1st, daily until last month's timesheet is closed (no money in the text). Analytics: weekly per-branch signals (last 7 days ≥ 3 and ≥ 2× the average of the previous 4 weeks) — the group gets a count, branch details go privately.
+
+Upgrade from v0.3: see [docs/IMPROVEMENTS.md](docs/IMPROVEMENTS.md#v031-2026-10-30).
+
 ## Built-in principles
 
 - **Seven decisions are made by a person only:** payroll approval, deductions, contract change, hiring, firing, mass broadcast, request approval.
@@ -102,7 +113,7 @@ Bots: set `BOT_TOKEN_HUB` (one bot that routes to all agents) or `BOT_TOKEN_<AGE
    - schedules (fixed, 2/2, 24/48);
    - pay rules (KPI cap, late penalty, % of sales, payday);
    - onboarding templates, document types, request kinds, SLA by position.
-2. `cp .env.example .env`. Set `JWT_SECRET`, `ADMIN_PASSWORD`, bot tokens, Telegram IDs, `WEBAPP_URL` (HTTPS) and `ANTHROPIC_API_KEY`.
+2. `cp .env.example .env`. Set `JWT_SECRET`, `ADMIN_PASSWORD`, bot tokens, Telegram IDs, `WEBAPP_URL` (HTTPS) and `ANTHROPIC_API_KEY`; `CAMERA_WEBHOOK_SECRET` only if an AI camera posts to the kit.
 3. `docker compose up -d --build`, then `docker compose run --rm api python -m app.seed --no-demo`.
 4. Load staff in the panel, then link people: branch heads in "Branch leads", employees through the Mini App.
 5. Pilot on 2–3 branches (one of them 24/7) for 2 weeks, with payroll calculated in parallel for one month.
@@ -129,7 +140,12 @@ The tests cover:
 - the small-group % rule;
 - offline agents and routing;
 - API permissions;
-- Mini App check-in.
+- Mini App check-in;
+- AI camera webhook (signature, replay window, dedupe, human marks win, no photos);
+- discipline rules (admin-only edits, warnings → fine, snapshot amounts);
+- ad checker, 2 variants, picking in words, confirm-word publish, agent tasks;
+- invite / reject preview, outbox at most once, free-text and atomic booking, reminders;
+- hire → onboarding handoff; tabel-close reminder; weekly per-branch signals.
 
 ## Layout
 
@@ -138,6 +154,7 @@ config/company.example.yaml   the only place a client is configured
 backend/app/
   models.py  rbac.py  auth.py  config.py  seed.py
   services/  attendance · schedules · payroll · people · onboarding · analytics · recruiting · interview · reports · notifications
+             camera · discipline · vacancies · ad_check · hiring · outbox · topic_reports · llm
   agents/    registry.py (agents) · tools.py (role-gated tools) · runtime.py (Claude tool loop + offline mode) · personas/*.md
   api/       panel.py · miniapp.py · agents.py
   bots/      main.py (aiogram: per-agent or hub bot, scheduler)

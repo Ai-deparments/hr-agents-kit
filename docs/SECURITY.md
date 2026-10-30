@@ -43,10 +43,32 @@
 - Docker runs as a non-root user, and the API is bound to `127.0.0.1` behind a TLS proxy.
 - Audit log of every agent message, tool call, money entry and decision.
 
+## v0.3.1 additions (2026-10-30)
+
+- **AI camera webhook:** HMAC-SHA256 over `<X-Timestamp>.<raw body>` with `CAMERA_WEBHOOK_SECRET`, compared in constant time;
+  ±5 min window against replay, every `X-Delivery-Id` processed once (unique key), body capped at `camera.max_body_kb`.
+  No secret → 503. The body and header values are never logged. Photo / face / base64 fields are stripped before anything is
+  stored (no biometrics — see the legal notes). Unmatched names reach only private chats of whole-network leaders and the
+  panel for whole-network users; branch scopes never see them.
+- **Outbox:** each message row is claimed (committed) before it is sent, so a crash or a second worker never sends it twice;
+  decisions carry a dedupe key, so a double click queues one message.
+- **Candidate texts are fixed:** invite / reject / booking / reminder texts come from code; the model only maps a reply to an
+  offered slot id, cancel or reschedule (JSON schema with an enum of the offered ids; anything else = unclear). Candidate
+  replies are data, not instructions.
+- **Ad texts:** every agent or HR text passes `services/ad_check.py` (foreign phones / links / @handles cut; numbers only from
+  the vacancy card and the admin-approved company facts; age only 18+; no gender / appearance / nationality / religion
+  requirements). Publishing needs HR's own exact confirm word, checked in code, also for the agent tool.
+- **Human-only actions stay human:** applying a discipline rule, rejecting a candidate, starting / dismissing a handoff and
+  applying an agent task all refuse `agent:*` actors and are audited. Rule edits and company facts are admin-only and logged
+  as before/after (free texts as lengths).
+- **Privacy in groups:** weekly signals and the onboarding waiting list go to the group as counts only; names and branch lines
+  only in private chats.
+
 ## Before production (checklist for the person deploying)
 
 - [ ] Fill `.env` with a random `JWT_SECRET` and `ADMIN_PASSWORD`, `DEBUG=0`. Never commit `.env`.
 - [ ] HTTPS domain with a reverse proxy (Caddy/nginx). Set `WEBAPP_URL` to that domain.
+- [ ] AI camera: set a random `CAMERA_WEBHOOK_SECRET` (≥ 32 chars) and share it only with the camera service; leave it empty if no camera posts to the kit.
 - [ ] In BotFather, keep the Bot API 10.2 Mini App origin restriction on (it is on by default).
 - [ ] Choose `attendance.check_mode` and set branch geofences in Panel → Engagement → Check-in zones.
 - [ ] Back up the database daily (volume `hrdata`) and test a restore.

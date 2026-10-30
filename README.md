@@ -67,7 +67,7 @@ Hammasi filial bo'yicha ruxsat bilan cheklangan.
 - **Bitta HR agent.** Rahbar, HR va egasi bitta agent bilan gaplashadi (barcha vositalar), xodim — o'z yordamchisi bilan. Tugmalar yo'q: hammasi oddiy so'z bilan.
 - **Agent kontekstni ko'radi.** Javob berilgan (reply) xabarni o'qiydi; vakansiya qoralamasi /start dan keyin ham yo'qolmaydi; til xabar matnidan aniqlanadi (lotin → o'zbek, kirill → rus).
 - **Vakansiyalar.** Agent HR so'zlaridan e'lon yozadi, tahrirlaydi, faqat buyruq bilan chop etadi; ommaviy /jobs sahifasi.
-- **Suhbat vaqtlari va ish taklifi.** HR vaqtlarni qo'shadi → nomzod botda raqam yozib tanlaydi → 2 soat oldin eslatma. Taklifni «qabul qilaman» deb qabul qilsa — xodim kartasi (sinov muddati) va onboarding kursi avtomatik.
+- **Suhbat vaqtlari va ish taklifi.** HR vaqtlarni qo'shadi → nomzod botda raqam yoki vaqtni yozib tanlaydi → bir kun oldin va 1 soat oldin eslatma. Taklifni «qabul qilaman» deb qabul qilsa — xodim kartasi (sinov muddati) va onboarding kursi avtomatik.
 - **HR hujjatlar (PDF).** Tahrirlanadigan shablonlar: ish joyidan ma'lumotnoma, ishga qabul va ta'til buyruqlari. Noma'lum maydon bo'sh chiziq bo'lib qoladi — hech narsa o'ylab topilmaydi.
 - **Onboarding materiallari.** Video va yo'riqnomalar lavozim/bo'lim bo'yicha, kunma-kun kurs, «ko'rdim» belgisi, suhbat eslatmalari.
 - **Guruh mavzulari bo'yicha hisobotlar.** Bot forum-guruhdagi mavzu nomlarini o'zi aniqlaydi va har bir hisobotni o'z mavzusiga yuboradi (davomat, rekruting, onboarding, oylik, tahlil) — ertalab va kechqurun; aytadigan narsa bo'lmasa yubormaydi.
@@ -76,6 +76,17 @@ Hammasi filial bo'yicha ruxsat bilan cheklangan.
 - **Integratsiyalar:** TimePay (Face ID davomat, jarima/bonus), Smartup (savdo), hh.uz (rezyume qidirish, faqat o'qish), KPI va ABC tahlil.
 - **Panel:** foydalanuvchilar, botga ruxsat so'rovlari (begona odamlarga bot javob bermaydi), rollar konstruktori, bo'limlar.
 - **Davomat aniqroq:** kirgan, lekin chiqishni belgilamagan xodim «keldi» deb hisoblanadi; 30 kun belgisiz xodim foizga kirmaydi va alohida ko'rsatiladi.
+
+### v0.3.1 da yangi
+
+- **AI kamera → davomat.** Imzolangan webhook (`POST /api/webhooks/camera`, HMAC, 5 daqiqalik oyna, takror yetkazish bir marta hisoblanadi). Kunning eng erta kelishi va eng kech ketishi olinadi; inson belgisi (Keldim, rahbar, HR tuzatishi) har doim ustun; rasmlar saqlanmaydi; ism faqat bitta xodimga aniq mos kelsa bog'lanadi, qolganlari HR uchun saqlanadi. Hisobotda kamera qatori (guruhda faqat sonlar), panelda «AI kamera» sahifasi (faqat o'qish).
+- **Intizom qoidalari.** Ro'yxat `company.yaml` da; matn va summalarni faqat admin panelda o'zgartiradi (audit: oldin/keyin). Qoidani odam qo'llaydi: avval N ta ogohlantirish, keyin jarima; yozilgan jarima summasi qoida keyin o'zgarsa ham o'zgarmaydi.
+- **Vakansiya studiyasi.** Kompaniya faktlari bloki (admin tasdiqlaydi) — agent faqat shundan va vakansiya kartasidan foydalanadi. Agent 2 ta variant yozadi; HR so'z bilan tanlaydi («2», «ikkinchisini ol») yoki o'zgartirishni yozadi. Har bir matn tekshiriladi: telefon/havolalar olib tashlanadi, raqamlar faqat manbadan, yosh faqat «18+», jins/tashqi ko'rinish/millat/din talablari yo'q. Panelda «agentga topshiriq» navbati — natijani odam qo'llaydi. Chop etish faqat aniq «e'lon qil» so'zi bilan («e'lon qilma» — chop etmaydi).
+- **Taklif / rad etish oldindan ko'rish bilan.** HR nomzod oladigan aynan xabarni ko'radi; xabar bir marta yuboriladi (outbox). Nomzod vaqtni erkin yozadi («10:30», «12.11 10:30», so'z bilan) — model faqat taklif qilingan vaqtga bog'lay oladi; band qilish atomar; vaqtni ko'chirish/bekor qilish ham so'z bilan. Eslatmalar: bir kun oldin 18:00 da va 1 soat oldin.
+- **Ishga olindi → onboarding.** Panelda «ishga olindi» deb belgilangan nomzod Onboarding'da «kutilmoqda» bo'ladi: bir bosishda xodim kartasi + 30/60/90 reja + kurs; sabab bilan olib tashlash. Onboarding hisobotida kutayotganlar soni.
+- **Hisobotlar.** Oylik: 1-sanadan o'tgan oy tabeli yopilguncha har kuni eslatma (summalarsiz). Tahlil: haftalik filial signallari (oxirgi 7 kun ≥ 3 va oldingi 4 hafta o'rtachasidan ≥ 2×) — guruhga faqat son, filiallar bo'yicha — shaxsiy xabarda.
+
+v0.3 dan yangilash va yangi `CAMERA_WEBHOOK_SECRET` (faqat AI kamera bo'lsa): [docs/IMPROVEMENTS.md](docs/IMPROVEMENTS.md#v031-2026-10-30).
 
 ### Qoidalar
 
@@ -178,7 +189,7 @@ Stek va kod qoidalari: [`.claude/skills/default-stack`](.claude/skills/default-s
 - **Один HR-агент.** Руководители, HR и владелец говорят с одним агентом (все инструменты), сотрудник — со своим помощником. Никаких кнопок: всё обычными словами.
 - **Агент видит контекст.** Читает сообщение, на которое ответили (reply); черновик вакансии не теряется после /start; язык — по тексту сообщения (латиница → узбекский, кириллица → русский).
 - **Вакансии.** Агент пишет объявление из слов HR, правит, публикует только по команде; публичная страница /jobs.
-- **Слоты собеседований и оффер.** HR добавляет время → кандидат выбирает номер в боте → напоминание за 2 часа. Пишет «qabul qilaman» на оффер — создаётся карточка сотрудника (испытательный срок) и курс онбординга.
+- **Слоты собеседований и оффер.** HR добавляет время → кандидат пишет номер или время в боте → напоминание накануне и за 1 час. Пишет «qabul qilaman» на оффер — создаётся карточка сотрудника (испытательный срок) и курс онбординга.
 - **HR-документы (PDF).** Редактируемые шаблоны: справка с места работы, приказы о приёме и об отпуске. Неизвестные поля остаются пустой строкой — ничего не выдумывается.
 - **Материалы онбординга.** Видео и инструкции по должности/отделу, курс по дням, отметка «ko'rdim», напоминания о беседах.
 - **Отчёты по темам группы.** Бот сам узнаёт названия тем в форум-группе и шлёт каждый отчёт в свою тему (посещаемость, рекрутинг, онбординг, зарплата, аналитика) — утром и вечером; если сказать нечего — не шлёт.
@@ -187,6 +198,17 @@ Stek va kod qoidalari: [`.claude/skills/default-stack`](.claude/skills/default-s
 - **Интеграции:** TimePay (Face ID, штрафы/бонусы), Smartup (продажи), hh.uz (поиск резюме, только чтение), KPI и ABC-анализ.
 - **Панель:** пользователи, запросы доступа к боту (незнакомым бот не отвечает), конструктор ролей, отделы.
 - **Точнее посещаемость:** отметил приход без ухода — «пришёл»; кто 30 дней без отметок — не входит в процент и показывается отдельно.
+
+### Новое в v0.3.1
+
+- **AI-камера → посещаемость.** Подписанный webhook (`POST /api/webhooks/camera`, HMAC, окно 5 минут, повторная доставка учитывается один раз). Берётся самый ранний приход и самый поздний уход за день; отметка человека (check-in, руководитель, правка HR) всегда главнее; фото не сохраняются; имя связывается только при точном совпадении с одним сотрудником, остальные сохраняются для HR. Строка камеры в отчёте (в группе — только числа), страница «AI-камера» в панели (только чтение).
+- **Правила дисциплины.** Список — в `company.yaml`; тексты и суммы меняет только админ в панели (аудит до/после). Правило применяет человек: сначала N предупреждений, потом штраф; сумма записанного штрафа не меняется, даже если правило потом изменят.
+- **Студия вакансий.** Блок «факты о компании» (утверждает админ) — агент пишет только из них и карточки вакансии. Агент пишет 2 варианта; HR выбирает словами («2», «второй») или пишет, что изменить. Каждый текст проверяется: телефоны/ссылки вырезаются, числа только из источников, возраст только «18+», без требований к полу/внешности/национальности/религии. В панели — очередь «задача агенту», результат применяет человек. Публикация только точным словом «опубликуй» («не опубликуй» — не публикует).
+- **Приглашение / отказ с предпросмотром.** HR видит ровно то сообщение, которое получит кандидат; оно уходит один раз (outbox). Кандидат пишет время свободно («10:30», «12.11 10:30», словами) — модель может сопоставить только с предложенным слотом; бронь атомарная; перенос/отмена — тоже словами. Напоминания: накануне в 18:00 и за 1 час.
+- **Нанят → онбординг.** Кандидат со статусом «нанят» в панели попадает в Онбординг как «ждёт старта»: одним нажатием карточка + план 30/60/90 + курс; убрать — с причиной. В отчёте онбординга — число ожидающих.
+- **Отчёты.** Зарплата: с 1-го числа каждый день, пока табель прошлого месяца не закрыт (без сумм). Аналитика: недельные сигналы по филиалам (последние 7 дней ≥ 3 и ≥ 2× среднего за 4 недели) — в группу только число, по филиалам — в личку.
+
+Обновление с v0.3 и новая переменная `CAMERA_WEBHOOK_SECRET` (только если есть AI-камера): [docs/IMPROVEMENTS.md](docs/IMPROVEMENTS.md#v031-2026-10-30).
 
 ### Принципы
 
