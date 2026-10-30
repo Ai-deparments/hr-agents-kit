@@ -35,6 +35,8 @@ def _key(e: Employee, by: str) -> str:
         return e.position.title if e.position else "—"
     if by == "status":
         return e.status
+    if by == "department":
+        return e.department.name if e.department else "—"
     return e.branch.name if e.branch else "—"
 
 

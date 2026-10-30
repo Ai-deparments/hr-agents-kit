@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from .api import agents, engagement, miniapp, panel, rauf
+from .api import agents, docs, engagement, hh, hiring, kpi, materials, miniapp, nudges, org, panel, rauf, vacancies
 from .config import settings
 from .db import init_db
 
@@ -37,7 +37,8 @@ MAX_BODY = 5 * 1024 * 1024  # uploads (SOP .md, sales CSV) are small; refuse any
 
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
-    if int(request.headers.get("content-length") or 0) > MAX_BODY:
+    limit = 50 * 1024 * 1024 if request.url.path == "/api/onboarding/materials" else MAX_BODY  # videos for the bot
+    if int(request.headers.get("content-length") or 0) > limit:
         return JSONResponse({"detail": "Request too large"}, status_code=413)
     resp = await call_next(request)
     resp.headers["X-Content-Type-Options"] = "nosniff"
@@ -50,6 +51,15 @@ async def security_headers(request: Request, call_next):
         resp.headers["Strict-Transport-Security"] = "max-age=31536000"
     return resp
 app.include_router(panel.router)
+app.include_router(org.router)
+app.include_router(kpi.router)
+app.include_router(hh.router)
+app.include_router(materials.router)
+app.include_router(vacancies.router)
+app.include_router(hiring.router)
+app.include_router(docs.router)
+app.include_router(nudges.router)
+app.include_router(vacancies.public)
 app.include_router(miniapp.router)
 app.include_router(agents.router)
 app.include_router(rauf.router)
@@ -66,7 +76,12 @@ def health():
 if WEB_DIST.exists():  # production: serve the built React app from the same origin
     app.mount("/assets", StaticFiles(directory=WEB_DIST / "assets"), name="assets")
 
+    _DIST = WEB_DIST.resolve()
+
     @app.get("/{path:path}", include_in_schema=False)
     def spa(path: str):
-        f = WEB_DIST / path
-        return FileResponse(f if path and f.is_file() else WEB_DIST / "index.html")
+        # resolve() + containment check: "%2e%2e/%2e%2e/.env" must never leave web/dist
+        f = (_DIST / path).resolve()
+        if path and f.is_file() and f.is_relative_to(_DIST):
+            return FileResponse(f)
+        return FileResponse(_DIST / "index.html")

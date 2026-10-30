@@ -66,8 +66,8 @@ def current_user(authorization: str | None = Header(None), db: Session = Depends
     return user
 
 
-def panel_scope(user: User = Depends(current_user)) -> Scope:
-    return scope_for_user(user)
+def panel_scope(user: User = Depends(current_user), db: Session = Depends(get_db)) -> Scope:
+    return scope_for_user(user, db)
 
 
 def require(perm: str):

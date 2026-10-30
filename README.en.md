@@ -45,6 +45,21 @@ Everything is limited by branch scope.
 - **Candidate consent and a retention purge** for candidates' personal data.
 - **Security audit:** see [docs/SECURITY.md](docs/SECURITY.md).
 
+### New in v0.3
+
+- **One HR agent** for managers, HR and the owner (all tools); employees get their own helper. No buttons — plain words only.
+- **Context-aware agent:** reads the replied-to message, keeps vacancy drafts across /start, picks the language from the message text.
+- **Vacancies** written from HR's words, edited and published only on command; public /jobs page.
+- **Interview slots and job offers** answered in words; an accepted offer creates the employee card (probation) and the onboarding course.
+- **HR documents as PDF** from editable templates (employment certificate, hire and leave orders); unknown fields stay blank.
+- **Onboarding materials:** videos and guides by position/department, day-by-day course, "seen" receipts, talk reminders.
+- **Reports per forum topic:** the bot learns topic names and posts each report (attendance, recruiting, onboarding, payroll, analytics) to its topic, morning and evening, and stays silent when there is nothing to say.
+- **Phone-first formatting:** rich messages with headings and short lists instead of wide tables.
+- **Weekly CEO digest** (rich + 3-sheet Excel) and **discipline reminders** drafted on Monday, sent only after HR approval.
+- **Integrations:** TimePay (Face ID attendance, fines/bonuses), Smartup (sales), hh.uz (read-only résumé search), KPI and ABC analysis.
+- **Panel:** users, bot access requests (strangers are ignored by the bot), role builder, departments.
+- **More accurate attendance:** checked in without check-out counts as present; people with no marks for 30 days are listed separately and excluded from the rate.
+
 ## Built-in principles
 
 - **Seven decisions are made by a person only:** payroll approval, deductions, contract change, hiring, firing, mass broadcast, request approval.

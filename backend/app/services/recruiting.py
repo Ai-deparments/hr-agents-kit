@@ -23,22 +23,46 @@ def missing_fields(v: dict) -> list[str]:
     return [f for f in cfg("recruiting.required_vacancy_fields", []) if not v.get(f)]
 
 
+URL_RE = re.compile(r"https?://\S+|t\.me/\S+|@\w{4,}")
+
+
+def _clean(text: str | None) -> list[str]:
+    """Free text written by the agent or HR: no phones, links or @handles (contacts come only from config)."""
+    out = []
+    for line in (text or "").splitlines():
+        line = URL_RE.sub("", PHONE_RE.sub("", line)).strip(" •-–*\t")
+        if line:
+            out.append(line)
+    return out
+
+
+def apply_url(v: Vacancy) -> str | None:
+    bot = (cfg("company.recruiter_bot") or "").lstrip("@")
+    return f"https://t.me/{bot}?start=vac_{v.id}" if bot and v.id else None
+
+
 def render_ad(v: Vacancy) -> str:
-    """Fixed template. Only the HR phone from config is allowed — any other phone is stripped."""
+    """Fixed template (hr-vacancy-writer): code fills it, the agent only supplies field values.
+    Salary is copied as given, never invented; contacts only from company config."""
     c = cfg("company", {})
-    req = PHONE_RE.sub("", v.requirements or "").strip()
-    lines = [f"📢 {c.get('name', '')} — {c.get('description', '')}", "", f"💼 {v.title}"]
+    lines = [f"📢 {c.get('name', '')} jamoasiga {v.title} kerak!".replace("  ", " ").strip()]
+    if intro := " ".join(_clean(v.intro)):
+        lines += ["", intro]
+    lines.append("")
     if v.branch:
-        lines.append(f"📍 {v.branch.name}" + (f", {v.branch.city}" if v.branch.city else ""))
+        lines.append(f"📍 {v.branch.name}" + (f", {v.branch.city}" if v.branch.city and v.branch.city not in v.branch.name else ""))
     if v.schedule_text:
-        lines.append(f"🕒 {v.schedule_text}")
-    if v.salary_text:
-        lines.append(f"💰 {v.salary_text}")
-    if req:
-        lines += ["", "Requirements:", req]
-    contacts = [x for x in (c.get("hr_phone"), c.get("recruiter_bot"), c.get("apply_form_url")) if x]
+        lines.append(f"🕒 Ish vaqti: {v.schedule_text}")
+    lines.append(f"💰 Maosh: {v.salary_text or 'suhbatda kelishiladi'}")
+    for head, field in (("✅ Vazifalar:", v.duties), ("📌 Talablar:", v.requirements), ("🎁 Biz taklif qilamiz:", v.benefits)):
+        items = _clean(field)
+        if items:
+            lines += ["", head] + [f"• {x}" for x in items]
+    contacts = [x for x in (c.get("hr_phone"), c.get("apply_form_url")) if x]
     if contacts:
         lines += ["", "☎️ " + " | ".join(contacts)]
+    if url := apply_url(v):
+        lines += ["", f"👉 Ariza topshirish: {url}"]
     return "\n".join(lines)
 
 
@@ -60,6 +84,9 @@ BANNED_PATTERNS = [
     r"\bhow old\b", r"\bmarri", r"\bwife\b|\bhusband\b", r"\bkids?\b",
     r"сколько\s+(вам|тебе)\s+лет", r"\bлет\s+вам\b", r"\bвозраст", r"замуж", r"жена[тт]", r"\bсупруг",
     r"\byosh(ingiz|ing)\b", r"necha\s+yosh", r"turmush", r"uylang", r"erga\s+chiq",
+    # requirements in job posts: age / gender limits ("yoshi 25 dan oshmagan", "до 30 лет", "faqat erkaklar")
+    r"\byoshi\b", r"\d{2}\s*(yosh|ёш)", r"\d{2}\s*(лет|years)", r"\bвозраст\w*", r"\bage\b",
+    r"\b(faqat\s+)?(erkak|ayol|qiz)(lar)?\b", r"\b(только\s+)?(мужчин|женщин|девушк)\w*", r"\b(male|female)\b",
 ]
 
 

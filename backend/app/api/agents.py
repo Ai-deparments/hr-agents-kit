@@ -28,7 +28,7 @@ class ChatIn(BaseModel):
 
 def _panel_as_bot(scope: Scope) -> Scope:
     """Panel users talk to agents with an equivalent bot role and the SAME branch scope."""
-    role = "owner" if scope.role in ("admin", "executive") else "hr_head" if scope.role in ("hr_manager", "payroll", "recruiter") else "manager"
+    role = "owner" if scope.role in ("admin", "ceo", "executive") else "hr_head" if scope.role in ("hr_manager", "payroll", "recruiter") else "manager"
     return Scope(scope.actor, role, scope.branch_ids, scope.payroll, None, scope.perms)
 
 

@@ -1,0 +1,117 @@
+{
+"signal": {
+"id": "5319164151094849427",
+"fallback": "📶",
+"use": "stats, reach"
+},
+"chart_up": {
+"id": "5318974936310627698",
+"fallback": "⏫",
+"use": "growth, metrics up"
+},
+"chart_down": {
+"id": "5316815985099946114",
+"fallback": "⏬",
+"use": "metrics down"
+},
+"eyes": {
+"id": "",
+"fallback": "👀",
+"use": "views"
+},
+"top": {
+"id": "5316635510574169206",
+"fallback": "🔝",
+"use": "top result, best"
+},
+"pin": {
+"id": "5316883252877738187",
+"fallback": "📍",
+"use": "important point, location"
+},
+"idea": {
+"id": "5316637280100693932",
+"fallback": "💡",
+"use": "idea, tip"
+},
+"moon": {
+"id": "5316710702566619149",
+"fallback": "🌙",
+"use": "evening, night"
+},
+"clock": {
+"id": "5316575093269214796",
+"fallback": "⏰",
+"use": "time, deadline"
+},
+"warning": {
+"id": "5316826301611390284",
+"fallback": "‼️",
+"use": "attention, important"
+},
+"check": {
+"id": "5316653334688446735",
+"fallback": "✅",
+"use": "done, success"
+},
+"user": {
+"id": "5316705578670636235",
+"fallback": "👤",
+"use": "person, profile"
+},
+"calendar": {
+"id": "",
+"fallback": "📅",
+"use": "date, schedule"
+},
+"siren": {
+"id": "5316996996496639181",
+"fallback": "🚨",
+"use": "urgent alert"
+},
+"trophy": {
+"id": "",
+"fallback": "🏆",
+"use": "best result, winner"
+},
+"chart": {
+"id": "",
+"fallback": "📊",
+"use": "report header"
+},
+"target": {
+"id": "",
+"fallback": "🎯",
+"use": "goal, focus"
+},
+"bell": {
+"id": "",
+"fallback": "🔔",
+"use": "reminder, alert"
+},
+"briefcase": {
+"id": "5317051834639071081",
+"fallback": "💼",
+"use": "business, work"
+},
+"money": {
+"id": "5316711376876485361",
+"fallback": "💰",
+"use": "revenue, price"
+},
+"wave": {
+"id": "5280856388594082819",
+"fallback": "👋",
+"use": "greeting, hello"
+},
+"cross": {
+"id": "5316538964004321334",
+"fallback": "🚫",
+"use": "failed, forbidden"
+},
+"fire": {
+"id": "5316924123786524990",
+"fallback": "🔥",
+"use": "hook, hot, trending"
+}
+}

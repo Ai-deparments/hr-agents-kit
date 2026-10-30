@@ -79,8 +79,9 @@ def calc_employee(emp: Employee, month: str, trow: dict, entries: list[PayrollEn
     kpi = 0
     if kpi_scores:
         cap = float(cfg("payroll.kpi_cap", 1.2))
-        kpi = round(base * min(kpi_scores[-1] / 100, cap))
-        lines.append(f"KPI = {base} × min({kpi_scores[-1]}/100, {cap}) = {kpi}")
+        share = float(cfg("payroll.kpi_share_of_base", 1.0))  # KPI part of pay at 100% = base × share
+        kpi = round(base * share * min(kpi_scores[-1] / 100, cap))
+        lines.append(f"KPI = {base} × {share} × min({kpi_scores[-1]}/100, {cap}) = {kpi}")
 
     sales_bonus = 0
     if cfg("payroll.sales_percent.enabled", False) and sales:

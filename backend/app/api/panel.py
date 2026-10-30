@@ -4,7 +4,7 @@ from __future__ import annotations
 import csv
 import io
 import time
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 from fastapi.responses import Response
@@ -15,8 +15,8 @@ from sqlalchemy.orm import Session
 from ..auth import check_password, current_user, make_token, panel_scope, require
 from ..config import cfg
 from ..db import get_db
-from ..models import (ApprovalRequest, AuditLog, Branch, BranchLead, Candidate, ChatMessage, Document, Employee, HrOverride,
-                      OnboardingPlan, PayrollEntry, Position, Region, SalesRecord, Sop, User, Vacancy)
+from ..models import (ApprovalRequest, AuditLog, Branch, BranchLead, Candidate, ChatMessage, Department, Document, Employee,
+                      HrOverride, OnboardingPlan, PayrollEntry, Position, Region, Registration, SalesRecord, Sop, User, Vacancy)
 from ..rbac import Scope, audit
 from ..services import analytics, attendance, onboarding, payroll, people, recruiting, reports
 
@@ -64,6 +64,7 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
     if not user or not user.active or not check_password(user, body.password):
         _ip_fails[ip] = recent + [time.time()]
         raise HTTPException(401, "Wrong login or password")
+    user.last_login = datetime.now()
     audit(db, Scope(f"user:{user.username}", user.role), "login")
     db.commit()
     return {"token": make_token(str(user.id), "panel", 7)}
@@ -89,6 +90,7 @@ def dictionaries(scope: Scope = Depends(panel_scope), db: Session = Depends(get_
             "branches": [{"id": b.id, "code": b.code, "name": b.name, "region_id": b.region_id, "city": b.city, "mode": b.mode,
                           "lat": b.lat, "lon": b.lon, "radius_m": b.radius_m} for b in branches],
             "positions": [{"id": p.id, "code": p.code, "title": p.title} for p in db.scalars(select(Position))],
+            "departments": [{"id": d.id, "name": d.name} for d in db.scalars(select(Department).order_by(Department.name))],
             "schedules": list((cfg("schedules") or {}).keys())}
 
 
@@ -99,7 +101,31 @@ def dashboard(scope: Scope = Depends(require("hr.read")), db: Session = Depends(
     o["documents_30d"] = len(people.expiring_documents(db, scope, 30))
     o["pending_approvals"] = len(list(db.scalars(select(ApprovalRequest.id).where(ApprovalRequest.status == "pending"))))
     o["vacancies"] = analytics.vacancies_sla(db, scope)[:5]
+    o["headcount"] = analytics.headcount(db, scope, "status")
+    o["departments"] = analytics.headcount(db, scope, "department")["groups"]
+    o["registrations_pending"] = (len(list(db.scalars(select(Registration.id).where(Registration.status == "pending"))))
+                                  if scope.can("registrations") else None)
+    o["turnover"] = {k: v for k, v in analytics.turnover(db, scope, 3).items() if k != "groups"}
+    days = []
+    for i in range(13, -1, -1):  # attendance trend: came vs scheduled, last 14 days
+        d = date.today() - timedelta(days=i)
+        s = attendance.day_summary(db, scope, d)
+        days.append({"day": d.isoformat(), "came": s["came"], "scheduled": s["scheduled"], "late": s["late"]})
+    o["days"] = days
     return o
+
+
+@router.get("/badges")
+def badges(scope: Scope = Depends(panel_scope), db: Session = Depends(get_db)):
+    """Header counters: things waiting for a person."""
+    out = {"registrations": None, "requests": None, "approvals": None}
+    if scope.can("registrations"):
+        out["registrations"] = len(list(db.scalars(select(Registration.id).where(Registration.status == "pending"))))
+    if scope.can("hr.read"):
+        out["requests"] = len(people.list_requests(db, scope, "pending"))
+        out["approvals"] = len([a for a in db.scalars(select(ApprovalRequest).where(ApprovalRequest.status == "pending"))
+                                if a.branch_id is None or scope.allows_branch(a.branch_id)])
+    return out
 
 
 # ---------------- employees ----------------
@@ -108,6 +134,7 @@ class EmployeeIn(BaseModel):
     full_name: str = Field(min_length=3)
     phone: str | None = None
     branch_id: int
+    department_id: int | None = None
     position_id: int | None = None
     hire_date: date | None = None
     status: str = "probation"
@@ -121,6 +148,8 @@ class EmployeeIn(BaseModel):
 def _emp_row(e: Employee, scope: Scope) -> dict:
     return {"id": e.id, "full_name": e.full_name, "phone": e.phone, "branch_id": e.branch_id,
             "branch": e.branch.name if e.branch else None, "position_id": e.position_id,
+            "department_id": e.department_id, "department": e.department.name if e.department else None,
+            "bot_functions": e.bot_functions or [],
             "position": e.position.title if e.position else None, "hire_date": e.hire_date, "fire_date": e.fire_date,
             "status": e.status, "pay_type": e.pay_type, "schedule_code": e.schedule_code,
             "leave_balance_days": e.leave_balance_days, "telegram_linked": e.telegram_id is not None,
@@ -162,7 +191,7 @@ def update_employee(emp_id: int, body: dict, scope: Scope = Depends(require("hr.
     e = db.get(Employee, emp_id)
     if not e or not scope.allows_branch(e.branch_id):
         raise HTTPException(404, "Not found")
-    allowed = {"full_name", "phone", "branch_id", "position_id", "hire_date", "status", "pay_type", "schedule_code",
+    allowed = {"full_name", "phone", "branch_id", "department_id", "position_id", "hire_date", "status", "pay_type", "schedule_code",
                "leave_balance_days", "telegram_id"} | ({"base_salary"} if scope.payroll else set())
     for k, v in body.items():
         if k in allowed:
@@ -559,7 +588,9 @@ def vacancies(scope: Scope = Depends(require("recruiting.read")), db: Session = 
         rows.append({"id": v.id, "title": v.title, "branch": v.branch.name if v.branch else None, "branch_id": v.branch_id,
                      "status": v.status, "salary_text": v.salary_text, "schedule_text": v.schedule_text,
                      "opened_at": v.opened_at, "sla_days": v.sla_days, "light": sla.get(v.id, {}).get("light"),
-                     "days_open": sla.get(v.id, {}).get("days_open"), "ad_text": v.ad_text or recruiting.render_ad(v)})
+                     "days_open": sla.get(v.id, {}).get("days_open"), "ad_text": v.ad_text or recruiting.render_ad(v),
+                     "public": v.public, "is_template": v.is_template, "published": v.published or {},
+                     "created_by": v.created_by})
     return rows
 
 
@@ -694,9 +725,3 @@ def audit_log(limit: int = 200, scope: Scope = Depends(require("audit.read")), d
         raise HTTPException(403, "Only users without branch restriction see audit")
     return [{"id": a.id, "ts": a.ts, "actor": a.actor, "role": a.actor_role, "action": a.action, "target": a.target,
              "details": a.details} for a in db.scalars(select(AuditLog).order_by(AuditLog.id.desc()).limit(min(limit, 1000)))]
-
-
-@router.get("/users")
-def users(scope: Scope = Depends(require("*")), db: Session = Depends(get_db)):
-    return [{"id": u.id, "username": u.username, "full_name": u.full_name, "role": u.role, "branch_scope": u.branch_scope,
-             "can_see_payroll": u.can_see_payroll, "active": u.active} for u in db.scalars(select(User))]

@@ -108,7 +108,49 @@ def _card(ctx: Ctx, employee_id: int):
     return people.employee_card(ctx.db, ctx.scope, emp)
 
 
-@tool("headcount", "Headcount grouped by branch | region | position | status.", {"by": {**S, "enum": ["branch", "region", "position", "status"]}})
+@tool("discipline_ranking", "Month discipline per employee (from the timesheet / TimePay check-ins): late days, "
+      "not-marked days, days needing review, worked vs norm hours. Worst first. 'Not marked' is not 'absent'.",
+      {"month": {**S, "description": "YYYY-MM, default this month"}, "limit": I})
+def _discipline(ctx: Ctx, month: str | None = None, limit: int = 15):
+    month = month or date.today().strftime("%Y-%m")
+    t = attendance.month_tabel(ctx.db, ctx.scope, month)
+    rows = [{"full_name": r["full_name"], "position": r["position"], "late_days": r["late_days"],
+             "not_marked_days": r["unknown_days"], "review_days": r["review_days"], "worked_hours": r["worked_hours"],
+             "norm_hours": r["norm_hours"]} for r in t["rows"]]
+    rows.sort(key=lambda x: -(x["late_days"] * 2 + x["not_marked_days"] + x["review_days"]))
+    return {"month": month, "employees": len(rows), "rows": rows[:max(1, min(limit, 50))],
+            "note": "not marked ≠ absent; a lead or HR confirms the reason"}
+
+
+@tool("employee_month", "One employee's attendance for a month: each day's status, check-in/out, hours, lateness.",
+      {"employee_id": I, "month": {**S, "description": "YYYY-MM"}}, required=["employee_id"])
+def _employee_month(ctx: Ctx, employee_id: int, month: str | None = None):
+    emp = ctx.db.get(Employee, employee_id)
+    if not emp or not ctx.scope.allows_branch(emp.branch_id):
+        return {"error": "not found"}
+    month = month or date.today().strftime("%Y-%m")
+    t = attendance.month_tabel(ctx.db, ctx.scope, month, emp.branch_id)
+    row = next((r for r in t["rows"] if r["employee_id"] == emp.id), None)
+    if not row:
+        return {"error": "no timesheet row for this month"}
+    days = [{"day": str(d), "code": c["c"], "hours": c["h"], "late_min": c.get("l")}
+            for d, c in zip(t["days"], row["cells"]) if c["c"] not in ("", "-")]
+    return {"full_name": emp.full_name, "month": month, "worked_hours": row["worked_hours"], "norm_hours": row["norm_hours"],
+            "late_days": row["late_days"], "not_marked_days": row["unknown_days"], "days": days}
+
+
+@tool("payroll_summary", "Month payroll per employee: accrued, KPI, bonus, penalties, advances, to pay, and the fund. "
+      "Shows numbers only — approval is a human action.", {"month": {**S, "description": "YYYY-MM"}}, needs_payroll=True)
+def _payroll_summary(ctx: Ctx, month: str | None = None):
+    month = month or date.today().strftime("%Y-%m")
+    t = payroll.payroll_table(ctx.db, ctx.scope, month)
+    keep = ("full_name", "position", "base", "accrued", "kpi", "bonus", "penalty", "advance", "total")
+    return {"month": month, "status": t["status"], "fund": t["fund"], "unknown_salary": t["unknown_salary"],
+            "rows": [{k: r.get(k) for k in keep} for r in t["rows"]][:40]}
+
+
+@tool("headcount", "Headcount grouped by branch | region | position | status | department.",
+      {"by": {**S, "enum": ["branch", "region", "position", "status", "department"]}})
 def _headcount(ctx: Ctx, by: str = "branch"):
     return analytics.headcount(ctx.db, ctx.scope, by)
 
@@ -122,6 +164,45 @@ def _turnover(ctx: Ctx, months: int = 3, by: str = "branch"):
 @tool("vacancies_sla", "Open vacancies with days open, SLA and traffic light.")
 def _vac(ctx: Ctx):
     return analytics.vacancies_sla(ctx.db, ctx.scope)
+
+
+@tool("vacancies_list", "All vacancies incl. DRAFTS: id, title, status, salary, schedule, branch, missing fields.")
+def _vac_list(ctx: Ctx):
+    from ..services import vacancies
+    rows = ctx.db.scalars(select(Vacancy).where(Vacancy.status != "closed", Vacancy.is_template.is_(False))
+                          .order_by(Vacancy.id.desc()).limit(30))
+    return [{"id": v.id, "title": v.title, "status": v.status, "salary": v.salary_text, "schedule": v.schedule_text,
+             "branch_id": v.branch_id, "missing": vacancies.missing(v)} for v in rows
+            if v.branch_id is None or ctx.scope.allows_branch(v.branch_id)]
+
+
+@tool("hr_document", "Issue an HR document as PDF from a template and send the file to the asker in Telegram. "
+      "Templates: employment_certificate (ish joyidan ma'lumotnoma), hire_order, leave_order (extra: leave_from, leave_to, "
+      "leave_days). Find the employee with search_employee first. Unknown fields stay blank and are listed — never invent.",
+      {"template_code": S, "employee_id": I, "extra": {"type": "object"}}, min_role="hr_head", required=["template_code", "employee_id"])
+def _hr_doc(ctx: Ctx, template_code: str, employee_id: int, extra: dict | None = None):
+    from ..config import ROOT
+    from ..models import DocTemplate, Outbox
+    from ..services import docgen
+    docgen.ensure_templates(ctx.db)
+    t = ctx.db.scalar(select(DocTemplate).where(DocTemplate.code == template_code, DocTemplate.active.is_(True)))
+    emp = ctx.db.get(Employee, employee_id)
+    if not t or not emp:
+        return {"error": "template or employee not found"}
+    try:
+        d = docgen.issue(ctx.db, ctx.scope, t, emp, {k: str(v) for k, v in (extra or {}).items()})
+    except PermissionError:
+        return {"error": "not your branch"}
+    sent = False
+    if ctx.scope.actor.startswith("tg:"):
+        out = ROOT / "data" / "uploads" / "docs"
+        out.mkdir(parents=True, exist_ok=True)
+        f = out / f"{d.number}.pdf"
+        f.write_bytes(docgen.pdf(d))
+        ctx.db.add(Outbox(telegram_id=int(ctx.scope.actor[3:]), text=f"{d.title} · {d.number} · {emp.full_name}", file_path=str(f)))
+        sent = True
+    ctx.db.commit()
+    return {"number": d.number, "missing_fields": d.missing, "pdf_sent_to_chat": sent}
 
 
 @tool("documents_expiring", "Certificates / medical books / check-ups expiring within N days.", {"days": I})
@@ -297,6 +378,31 @@ def _vac_draft(ctx: Ctx, title: str, branch_id: int | None = None, position_code
             "note": "HR approves in the panel or with the ✅ button."}
 
 
+@tool("vacancy_write", "Write a vacancy post from HR's words (agent fills a fixed template; never invents salary, phones, "
+      "links). Returns the draft id and text; missing fields are listed.", {"brief": S}, min_role="hr_head", required=["brief"])
+def _vac_write(ctx: Ctx, brief: str):
+    from ..services import vacancies
+    v = vacancies.from_brief(ctx.db, ctx.scope, brief)
+    ctx.db.commit()
+    return {"vacancy_id": v.id, "text": v.ad_text, "missing": vacancies.missing(v),
+            "next": "HR: say what to change, or 'e'lon qil' to publish"}
+
+
+@tool("vacancy_publish", "Publish a vacancy draft (bot list + public jobs page) — only when HR explicitly asked to publish.",
+      {"vacancy_id": I}, min_role="hr_head", required=["vacancy_id"])
+def _vac_publish(ctx: Ctx, vacancy_id: int):
+    from ..services import vacancies
+    v = ctx.db.get(Vacancy, vacancy_id)
+    if not v:
+        return {"error": "not found"}
+    try:
+        done = vacancies.publish(ctx.db, ctx.scope, v, web=True)
+    except ValueError as e:
+        return {"error": str(e), "missing": vacancies.missing(v)}
+    ctx.db.commit()
+    return {"published": sorted(done), "jobs_page": True}
+
+
 @tool("ads_deals", "Ad placement deals in Telegram channels by stage.", min_role="hr_head")
 def _deals(ctx: Ctx):
     return [{"id": d.id, "channel": d.channel, "subscribers": d.subscribers, "stage": d.stage, "price": d.price,
@@ -336,3 +442,59 @@ def execute(ctx: Ctx, t: Tool, args: dict) -> str:
         res = {"error": str(e)}
     audit(ctx.db, ctx.scope, "tool_call", t.name, agent=ctx.agent, args=args)
     return json.dumps(res, ensure_ascii=False, default=str)[:12000]
+
+
+# ---------------- onboarding course (video lessons / instructions from the library) ----------------
+
+@tool("my_materials", "The user's OWN onboarding materials (videos, instructions): what was sent, viewed, planned.",
+      min_role="employee")
+def _my_materials(ctx: Ctx):
+    from ..services import onboarding_media
+    return {"items": onboarding_media.my_materials(ctx.db, _self(ctx))}
+
+
+@tool("send_my_material", "Send one of the user's OWN onboarding materials again to their Telegram (by send_id from my_materials).",
+      {"send_id": I}, min_role="employee", required=["send_id"])
+def _send_my_material(ctx: Ctx, send_id: int):
+    from ..services import onboarding_media
+    ok = onboarding_media.resend(ctx.db, _self(ctx), send_id)
+    ctx.db.commit()
+    return {"ok": ok}
+
+
+@tool("interview_invite", "Invite a candidate to an interview: the bot sends them the free time slots, they answer with a "
+      "number. Needs free slots added by HR.", {"candidate_id": I}, min_role="hr_head", required=["candidate_id"])
+def _interview_invite(ctx: Ctx, candidate_id: int):
+    from ..services import hiring
+    c = ctx.db.get(Candidate, candidate_id)
+    if not c:
+        return {"error": "not found"}
+    try:
+        out = hiring.invite(ctx.db, ctx.scope, c)
+    except ValueError as e:
+        return {"error": str(e)}
+    ctx.db.commit()
+    return out
+
+
+@tool("onboarding_course_plan", "Propose an onboarding course for an employee: library videos/instructions that fit their "
+      "position and department, with day and reason. Nothing is sent.", {"employee_id": I}, required=["employee_id"])
+def _course_plan(ctx: Ctx, employee_id: int):
+    from ..services import onboarding_media
+    e = ctx.db.get(Employee, employee_id)
+    if not e or not ctx.scope.allows_branch(e.branch_id):
+        return {"error": "not found"}
+    return {"employee": e.full_name, "profile": onboarding_media.profile(e), "items": onboarding_media.plan(ctx.db, e)}
+
+
+@tool("onboarding_course_start", "Start the proposed onboarding course for an employee (schedules it; day-0 items are sent now). "
+      "Use after onboarding_course_plan when HR asked to start it.", {"employee_id": I}, min_role="hr_head", required=["employee_id"])
+def _course_start(ctx: Ctx, employee_id: int):
+    from ..services import onboarding_media
+    e = ctx.db.get(Employee, employee_id)
+    if not e or not ctx.scope.allows_branch(e.branch_id):
+        return {"error": "not found"}
+    n = onboarding_media.assign(ctx.db, ctx.scope, e, onboarding_media.plan(ctx.db, e))
+    sent = onboarding_media.deliver_due(ctx.db)
+    ctx.db.commit()
+    return {"scheduled": n, "sent_now": sent, "telegram_linked": e.telegram_id is not None}

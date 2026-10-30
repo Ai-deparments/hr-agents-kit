@@ -82,19 +82,20 @@ export function ReasonModal({ title, confirmLabel, onSubmit, onClose, extra }: {
 }
 
 const STATUS: Record<string, [string, string]> = {
-  present: ["came", "b-ok"], late: ["late", "b-warn"], on_shift: ["on shift", "b-info"], absent: ["absent", "b-bad"],
-  leave: ["leave", "b-info"], unmarked: ["not marked", ""], off: ["day off", ""], needs_review: ["review", "b-warn"],
-  conflict: ["conflict", "b-bad"], not_employed: ["—", ""],
-  pending: ["pending", "b-warn"], approved: ["approved", "b-ok"], rejected: ["rejected", "b-bad"],
-  new: ["new", "b-info"], shortlist: ["shortlist", "b-ok"], hired: ["hired", "b-ok"],
-  draft: ["draft", ""], open: ["open", "b-ok"], closed: ["closed", ""], calculated: ["calculated", "b-info"], paid: ["paid", "b-ok"],
-  probation: ["probation", "b-warn"], active: ["active", "b-ok"], fired: ["fired", "b-bad"],
+  present: ["st_present", "b-ok"], late: ["st_late", "b-warn"], on_shift: ["st_on_shift", "b-info"], absent: ["st_absent", "b-bad"],
+  leave: ["st_leave", "b-info"], unmarked: ["st_unmarked", ""], off: ["st_off", ""], needs_review: ["st_needs_review", "b-warn"], untracked: ["st_untracked", ""],
+  conflict: ["st_conflict", "b-bad"], not_employed: ["—", ""],
+  pending: ["st_pending", "b-warn"], approved: ["st_approved", "b-ok"], rejected: ["st_rejected", "b-bad"],
+  new: ["st_new", "b-info"], shortlist: ["st_shortlist", "b-ok"], hired: ["st_hired", "b-ok"],
+  draft: ["st_draft", ""], open: ["st_open", "b-ok"], closed: ["st_closed", ""], calculated: ["st_calculated", "b-info"], paid: ["st_paid", "b-ok"],
+  probation: ["st_probation", "b-warn"], active: ["st_active", "b-ok"], fired: ["st_fired", "b-bad"],
 };
 
 export function Status({ s }: { s: string | null | undefined }) {
+  const t = useT();
   if (!s) return <span className="badge">—</span>;
   const [label, cls] = STATUS[s] || [s, ""];
-  return <span className={`badge ${cls}`}>{label}</span>;
+  return <span className={`badge ${cls}`}>{STATUS[s] ? t(label) : label}</span>;
 }
 
 export function Light({ c }: { c?: string | null }) {
@@ -115,6 +116,7 @@ export function Tile({ label, value, sub }: { label: string; value: ReactNode; s
   );
 }
 
-export function Empty({ text = "Nothing here yet" }: { text?: string }) {
-  return <div className="muted" style={{ padding: "18px 0", textAlign: "center" }}>{text}</div>;
+export function Empty({ text }: { text?: string }) {
+  const t = useT();
+  return <div className="muted" style={{ padding: "18px 0", textAlign: "center" }}>{text ?? t("c_empty")}</div>;
 }

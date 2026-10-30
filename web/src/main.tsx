@@ -4,13 +4,16 @@ import { api } from "./api";
 import { Lang, LangCtx } from "./i18n";
 import MiniApp from "./miniapp/MiniApp";
 import Panel from "./panel/Panel";
+import Jobs from "./Jobs";
 import RaufMini from "./rauf/RaufMini";
 import RaufPanel from "./rauf/RaufPanel";
+import "./pitaka.css";
 import "./styles.css";
+import "./dice.css";
 
 function Root() {
   const [lang, setLangState] = useState<Lang>(() => {
-    try { return (localStorage.getItem("hrkit.lang") as Lang) || "en"; } catch { return "en"; }
+    try { return (localStorage.getItem("hrkit.lang") as Lang) || "uz"; } catch { return "uz"; }
   });
   const setLang = (l: Lang) => {
     setLangState(l);
@@ -18,9 +21,7 @@ function Root() {
   };
   useEffect(() => {
     api("/api/config/public").then((c) => {
-      const color = c?.branding?.primary_color;
-      if (color) document.documentElement.style.setProperty("--primary", color);
-      if (c?.branding?.accent_color) document.documentElement.style.setProperty("--accent", c.branding.accent_color);
+      // Pitaka look: primary is ink, the single accent lives in pitaka.css — branding only names the app
       document.title = c?.branding?.short || "HR";
       let stored: string | null = null;
       try { stored = localStorage.getItem("hrkit.lang"); } catch { /* ignore */ }
@@ -31,7 +32,7 @@ function Root() {
   const isMini = p === "/m" || p.startsWith("/m/");
   return (
     <LangCtx.Provider value={{ lang, setLang }}>
-      {p.startsWith("/m/rauf") ? <RaufMini /> : isMini ? <MiniApp /> : p.startsWith("/rauf") ? <RaufPanel /> : <Panel />}
+      {p === "/jobs" || p.startsWith("/jobs/") ? <Jobs /> : p.startsWith("/m/rauf") ? <RaufMini /> : isMini ? <MiniApp /> : p.startsWith("/rauf") ? <RaufPanel /> : <Panel />}
     </LangCtx.Provider>
   );
 }

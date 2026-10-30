@@ -74,7 +74,7 @@ def test_excel_formula_injection_is_neutralised(db):
     e.full_name = '=HYPERLINK("http://evil","x")'
     db.flush()
     wb = load_workbook(io.BytesIO(reports.day_excel(db, OWNER, date.today())))
-    vals = [r[0].value for r in wb.active.iter_rows(min_row=2)]
+    vals = [c.value for row in wb["DETAILED DATA"].iter_rows() for c in row]
     assert "'=HYPERLINK(\"http://evil\",\"x\")" in vals
     e.full_name = old
 

@@ -43,6 +43,26 @@ class Position(Base):
     is_manager: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
+class Department(Base):
+    """Created only by the main admin."""
+    __tablename__ = "departments"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), unique=True)
+    description: Mapped[str] = mapped_column(String(300), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+
+
+class Role(Base):
+    """Panel role built by the main admin: a named set of permissions. `system` roles cannot be deleted."""
+    __tablename__ = "roles"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(40), unique=True)
+    name: Mapped[str] = mapped_column(String(120))
+    description: Mapped[str] = mapped_column(String(500), default="")
+    perms: Mapped[list] = mapped_column(JSON, default=list)
+    system: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
 class Employee(Base):
     __tablename__ = "employees"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -50,6 +70,8 @@ class Employee(Base):
     phone: Mapped[str | None] = mapped_column(String(32))
     telegram_id: Mapped[int | None] = mapped_column(Integer, unique=True)
     branch_id: Mapped[int | None] = mapped_column(ForeignKey("branches.id"), index=True)
+    department_id: Mapped[int | None] = mapped_column(ForeignKey("departments.id"), index=True)
+    bot_functions: Mapped[list] = mapped_column(JSON, default=list)  # sub-agent functions HR opened in the bot
     position_id: Mapped[int | None] = mapped_column(ForeignKey("positions.id"))
     hire_date: Mapped[date | None] = mapped_column(Date)
     fire_date: Mapped[date | None] = mapped_column(Date)
@@ -63,6 +85,7 @@ class Employee(Base):
     allowances: Mapped[dict] = mapped_column(JSON, default=dict)
 
     branch: Mapped[Branch | None] = relationship()
+    department: Mapped[Department | None] = relationship()
     position: Mapped[Position | None] = relationship()
 
     @property
@@ -86,7 +109,9 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(60), unique=True)
     full_name: Mapped[str] = mapped_column(String(160), default="")
     password_hash: Mapped[str] = mapped_column(String(255))
-    role: Mapped[str] = mapped_column(String(20))  # admin | hr_manager | payroll | executive | manager | recruiter
+    role: Mapped[str] = mapped_column(String(40))  # roles.code (admin | ceo | hr_manager | payroll | ... | custom)
+    telegram_id: Mapped[int | None] = mapped_column(Integer)      # set when the user joined through a Telegram invite
+    last_login: Mapped[datetime | None] = mapped_column(DateTime)
     branch_scope: Mapped[list | None] = mapped_column(JSON, default=None)  # None = all branches
     can_see_payroll: Mapped[bool] = mapped_column(Boolean, default=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -199,6 +224,64 @@ class PeriodStatus(Base):
     approve_reason: Mapped[str | None] = mapped_column(String(300))
 
 
+class KpiMetric(Base):
+    """A KPI the company measures. Applies to a position and/or department (None = everyone)."""
+    __tablename__ = "kpi_metrics"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(120))
+    unit: Mapped[str] = mapped_column(String(20), default="")
+    direction: Mapped[str] = mapped_column(String(4), default="up")  # up = more is better | down = less is better
+    target: Mapped[float] = mapped_column(Float)
+    weight: Mapped[int] = mapped_column(Integer, default=1)
+    position_id: Mapped[int | None] = mapped_column(ForeignKey("positions.id"))
+    department_id: Mapped[int | None] = mapped_column(ForeignKey("departments.id"))
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class KpiValue(Base):
+    __tablename__ = "kpi_values"
+    __table_args__ = (UniqueConstraint("employee_id", "metric_id", "month"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    employee_id: Mapped[int] = mapped_column(ForeignKey("employees.id"), index=True)
+    metric_id: Mapped[int] = mapped_column(ForeignKey("kpi_metrics.id"))
+    month: Mapped[str] = mapped_column(String(7), index=True)
+    value: Mapped[float] = mapped_column(Float)
+    author: Mapped[str] = mapped_column(String(80))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=now, onupdate=now)
+
+
+class ExternalRef(Base):
+    """Link between our record and an id in an outside system (smartup agent, timepay employee, ...)."""
+    __tablename__ = "external_refs"
+    __table_args__ = (UniqueConstraint("source", "kind", "external_id"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    source: Mapped[str] = mapped_column(String(20))
+    kind: Mapped[str] = mapped_column(String(20))  # employee | branch
+    external_id: Mapped[str] = mapped_column(String(200))
+    local_id: Mapped[int] = mapped_column(Integer)
+
+
+class Setting(Base):
+    """Small key -> JSON settings edited in the panel (analytics thresholds etc.)."""
+    __tablename__ = "settings"
+    key: Mapped[str] = mapped_column(String(60), primary_key=True)
+    value: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class ReportFile(Base):
+    """Reports attached in HR analytics (xlsx / pdf / csv / docx)."""
+    __tablename__ = "report_files"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    title: Mapped[str] = mapped_column(String(200))
+    month: Mapped[str | None] = mapped_column(String(7))
+    kind: Mapped[str] = mapped_column(String(20), default="other")  # kpi | abc | payroll | other
+    filename: Mapped[str] = mapped_column(String(200))
+    path: Mapped[str] = mapped_column(String(300))
+    size: Mapped[int] = mapped_column(Integer)
+    uploaded_by: Mapped[str] = mapped_column(String(80))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+
+
 class SalesRecord(Base):
     __tablename__ = "sales_records"
     __table_args__ = (UniqueConstraint("employee_id", "month"),)
@@ -230,6 +313,45 @@ class OnboardingItem(Base):
     done: Mapped[bool] = mapped_column(Boolean, default=False)
     done_at: Mapped[datetime | None] = mapped_column(DateTime)
     done_by: Mapped[str | None] = mapped_column(String(80))
+
+
+class OnboardingMaterial(Base):
+    """Video / method / document HR sends to chosen employees through the bot."""
+    __tablename__ = "onboarding_materials"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    title: Mapped[str] = mapped_column(String(200))
+    description: Mapped[str] = mapped_column(Text, default="")
+    kind: Mapped[str] = mapped_column(String(10))  # video | document | link
+    filename: Mapped[str | None] = mapped_column(String(200))
+    path: Mapped[str | None] = mapped_column(String(300))
+    url: Mapped[str | None] = mapped_column(String(500))
+    size: Mapped[int] = mapped_column(Integer, default=0)
+    created_by: Mapped[str] = mapped_column(String(80))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+    # who it is for (empty = everyone) and when in the first weeks it is sent
+    position_ids: Mapped[list | None] = mapped_column(JSON)
+    department_ids: Mapped[list | None] = mapped_column(JSON)
+    day_offset: Mapped[int] = mapped_column(Integer, default=0)   # day N after the start of onboarding
+    for_new: Mapped[bool] = mapped_column(Boolean, default=True)  # part of the automatic course for newcomers
+
+
+class MaterialSend(Base):
+    """Who got a material, and with whom a talk on it was scheduled."""
+    __tablename__ = "material_sends"
+    __table_args__ = (UniqueConstraint("material_id", "employee_id"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    material_id: Mapped[int] = mapped_column(ForeignKey("onboarding_materials.id"), index=True)
+    employee_id: Mapped[int] = mapped_column(ForeignKey("employees.id"), index=True)
+    sent_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+    talk_at: Mapped[datetime | None] = mapped_column(DateTime)
+    talk_with: Mapped[str | None] = mapped_column(String(160))
+    talk_done: Mapped[bool] = mapped_column(Boolean, default=False)
+    talk_note: Mapped[str | None] = mapped_column(String(500))
+    scheduled_for: Mapped[date | None] = mapped_column(Date)       # course item: delivered on this day
+    queued: Mapped[bool] = mapped_column(Boolean, default=True)     # already handed to the bot outbox
+    viewed_at: Mapped[datetime | None] = mapped_column(DateTime)    # employee pressed "Ko'rdim"
+    reason: Mapped[str | None] = mapped_column(String(300))        # why the agent picked it
+    employee: Mapped[Employee] = relationship()
 
 
 class Sop(Base):
@@ -302,7 +424,26 @@ class Vacancy(Base):
     closed_at: Mapped[date | None] = mapped_column(Date)
     sla_days: Mapped[int] = mapped_column(Integer, default=21)
     ad_text: Mapped[str | None] = mapped_column(Text)
+    intro: Mapped[str | None] = mapped_column(Text)        # free-text opening written by the agent
+    duties: Mapped[str | None] = mapped_column(Text)       # one per line
+    benefits: Mapped[str | None] = mapped_column(Text)     # one per line
+    public: Mapped[bool] = mapped_column(Boolean, default=False)       # shown on the public /jobs page
+    is_template: Mapped[bool] = mapped_column(Boolean, default=False)  # kept in the library for reuse
+    published: Mapped[dict | None] = mapped_column(JSON)   # platform -> when / message id (never twice)
+    created_by: Mapped[str | None] = mapped_column(String(80))
     branch: Mapped[Branch | None] = relationship()
+
+
+class VacancyRevision(Base):
+    """Last versions of a vacancy text (edit / rewrite / revert)."""
+    __tablename__ = "vacancy_revisions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    vacancy_id: Mapped[int] = mapped_column(ForeignKey("vacancies.id"), index=True)
+    fields: Mapped[dict] = mapped_column(JSON, default=dict)
+    ad_text: Mapped[str] = mapped_column(Text)
+    comment: Mapped[str | None] = mapped_column(String(500))
+    author: Mapped[str] = mapped_column(String(80))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
 
 
 class Candidate(Base):
@@ -324,6 +465,77 @@ class Candidate(Base):
     vacancy: Mapped[Vacancy | None] = relationship()
 
 
+class InterviewSlot(Base):
+    """A free interview time HR offers; the candidate picks one in the bot by number."""
+    __tablename__ = "interview_slots"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    vacancy_id: Mapped[int | None] = mapped_column(ForeignKey("vacancies.id"))
+    starts_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    minutes: Mapped[int] = mapped_column(Integer, default=30)
+    place: Mapped[str] = mapped_column(String(300), default="")       # address or meeting link
+    interviewer: Mapped[str] = mapped_column(String(160), default="")
+    candidate_id: Mapped[int | None] = mapped_column(ForeignKey("candidates.id"))
+    status: Mapped[str] = mapped_column(String(10), default="free")   # free | booked | done | cancelled
+    reminded: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_by: Mapped[str] = mapped_column(String(80), default="")
+
+
+class CandidateStep(Base):
+    """Open step waiting for the candidate's answer in the bot: slot choice or offer."""
+    __tablename__ = "candidate_steps"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    candidate_id: Mapped[int] = mapped_column(ForeignKey("candidates.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(10))                     # slots | offer
+    data: Mapped[dict] = mapped_column(JSON, default=dict)            # slots: {"ids": [...]}; offer: position, salary, start, text
+    status: Mapped[str] = mapped_column(String(10), default="open")   # open | done | declined | cancelled
+    created_by: Mapped[str] = mapped_column(String(80), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+    answered_at: Mapped[datetime | None] = mapped_column(DateTime)
+    candidate: Mapped["Candidate"] = relationship()
+
+
+class DocTemplate(Base):
+    """HR document template: plain text with {placeholders}; HR edits it in the panel."""
+    __tablename__ = "doc_templates"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(40), unique=True)
+    title: Mapped[str] = mapped_column(String(200))
+    body: Mapped[str] = mapped_column(Text)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    updated_by: Mapped[str] = mapped_column(String(80), default="")
+
+
+class HrDoc(Base):
+    """An issued document: the rendered text is kept, the PDF is rebuilt on download."""
+    __tablename__ = "hr_docs"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    template_code: Mapped[str] = mapped_column(String(40))
+    title: Mapped[str] = mapped_column(String(200))
+    number: Mapped[str] = mapped_column(String(40))
+    employee_id: Mapped[int | None] = mapped_column(ForeignKey("employees.id"), index=True)
+    body: Mapped[str] = mapped_column(Text)
+    missing: Mapped[list] = mapped_column(JSON, default=list)
+    created_by: Mapped[str] = mapped_column(String(80), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+    employee: Mapped["Employee | None"] = relationship()
+
+
+class Nudge(Base):
+    """Weekly discipline reminder drafted by the system; goes out only after HR approves (and may edit) it."""
+    __tablename__ = "nudges"
+    __table_args__ = (UniqueConstraint("employee_id", "week"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    employee_id: Mapped[int] = mapped_column(ForeignKey("employees.id"), index=True)
+    week: Mapped[str] = mapped_column(String(10))                      # monday ISO date
+    late_days: Mapped[int] = mapped_column(Integer, default=0)
+    late_min: Mapped[int] = mapped_column(Integer, default=0)
+    text: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(10), default="draft")   # draft | sent | skipped
+    decided_by: Mapped[str | None] = mapped_column(String(80))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+    employee: Mapped["Employee"] = relationship()
+
+
 class AdDeal(Base):
     __tablename__ = "ad_deals"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -338,6 +550,62 @@ class AdDeal(Base):
     post_at: Mapped[datetime | None] = mapped_column(DateTime)
     notes: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+
+
+class Registration(Base):
+    """'I am an employee' request from the bot. HR links it to a card and opens bot functions."""
+    __tablename__ = "registrations"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    telegram_id: Mapped[int] = mapped_column(Integer, index=True)
+    tg_username: Mapped[str | None] = mapped_column(String(64))
+    full_name: Mapped[str] = mapped_column(String(160))
+    position_text: Mapped[str] = mapped_column(String(160))
+    region_text: Mapped[str] = mapped_column(String(160))
+    status: Mapped[str] = mapped_column(String(10), default="pending")  # pending | approved | rejected
+    employee_id: Mapped[int | None] = mapped_column(ForeignKey("employees.id"))
+    functions: Mapped[list] = mapped_column(JSON, default=list)
+    decided_by: Mapped[str | None] = mapped_column(String(80))
+    decision_reason: Mapped[str | None] = mapped_column(String(300))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime)
+    # access requests: a stranger wrote to an agent bot -> silent, recorded here for HR
+    source: Mapped[str] = mapped_column(String(10), default="form")  # form ("I am an employee") | access (stranger)
+    bots: Mapped[list | None] = mapped_column(JSON)
+    last_at: Mapped[datetime | None] = mapped_column(DateTime)
+    requests: Mapped[int] = mapped_column(Integer, default=1)
+
+
+class PanelInvite(Base):
+    """'Add via Telegram': a one-time link to the bot; the person opens it, HR approves, the bot sends a login."""
+    __tablename__ = "panel_invites"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    token: Mapped[str] = mapped_column(String(40), unique=True)
+    role: Mapped[str] = mapped_column(String(40))
+    branch_scope: Mapped[list | None] = mapped_column(JSON)
+    can_see_payroll: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_by: Mapped[str] = mapped_column(String(80))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+    expires_at: Mapped[datetime] = mapped_column(DateTime)
+    status: Mapped[str] = mapped_column(String(10), default="open")  # open | pending | approved | rejected | expired
+    telegram_id: Mapped[int | None] = mapped_column(Integer)
+    tg_name: Mapped[str | None] = mapped_column(String(160))
+    tg_username: Mapped[str | None] = mapped_column(String(64))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+
+
+class Outbox(Base):
+    """Messages the panel wants the bot to send (the API process has no bot). The bot polls and marks sent."""
+    __tablename__ = "outbox"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    telegram_id: Mapped[int] = mapped_column(Integer)
+    text: Mapped[str] = mapped_column(Text)
+    file_path: Mapped[str | None] = mapped_column(String(300))  # attachment stored under data/uploads
+    buttons: Mapped[list | None] = mapped_column(JSON)  # [[{"text":..,"callback_data"|"url":..}]] inline keyboard
+    topic: Mapped[str | None] = mapped_column(String(20))  # report kind -> forum topic when sent to the reports group
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime)
+    error: Mapped[str | None] = mapped_column(String(300))
 
 
 class ChatMessage(Base):

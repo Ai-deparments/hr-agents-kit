@@ -16,6 +16,30 @@ from ..rbac import Scope
 from . import schedules as sch
 
 PRESENT = {"present", "late", "on_shift"}
+NOT_SCHEDULED = {"off", "not_employed", "leave", "untracked"}
+UNTRACKED_DAYS = 30  # no check-in at all for this long = the person does not use the time system (not "absent")
+
+
+def untracked_ids(db: Session, emp_ids: list[int], d: date) -> set[int]:
+    """Employees with zero check-ins in the last UNTRACKED_DAYS (only when the system already has that much history)."""
+    from sqlalchemy import func
+    start = datetime.combine(d - timedelta(days=UNTRACKED_DAYS), datetime.min.time())
+    first = db.scalar(select(func.min(AttendanceEvent.ts)))
+    if not first or first > start:
+        return set()
+    seen = set(db.scalars(select(AttendanceEvent.employee_id).where(
+        AttendanceEvent.employee_id.in_(emp_ids or [-1]), AttendanceEvent.ts >= start,
+        AttendanceEvent.ts < datetime.combine(d + timedelta(days=1), datetime.min.time())).distinct()))
+    return set(emp_ids) - seen
+
+
+def came(status: str, check_in: str | None = None) -> bool:
+    """Checked in = came. A missing check-out (needs_review) still means the person was at work."""
+    return status in PRESENT or (status == "needs_review" and bool(check_in))
+
+
+def was_late(status: str, late_min: int | None) -> bool:
+    return status == "late" or (status == "needs_review" and bool(late_min))
 
 
 @dataclass
@@ -165,6 +189,10 @@ def employees_in_scope(db: Session, scope: Scope, branch_id: int | None = None, 
             return []
         q = q.where(Employee.branch_id == branch_id)
     emps = list(db.scalars(q))
+    # field staff without time tracking (e.g. sales agents from Smartup) never count as "not marked"
+    untracked = set(cfg("attendance.untracked_departments", []) or [])
+    if untracked:
+        emps = [e for e in emps if not (e.department and e.department.name in untracked)]
     if active_on:
         emps = [e for e in emps if sch.employed_on(e, active_on) and (e.status != "fired" or (e.fire_date and e.fire_date >= active_on))]
     return emps
@@ -173,32 +201,36 @@ def employees_in_scope(db: Session, scope: Scope, branch_id: int | None = None, 
 def day_summary(db: Session, scope: Scope, d: date, branch_id: int | None = None, now: datetime | None = None) -> dict:
     emps = employees_in_scope(db, scope, branch_id, active_on=d)
     data = AttendanceData(db, [e.id for e in emps], d, d)
+    silent = untracked_ids(db, [e.id for e in emps], d)
     rows, by_branch = [], defaultdict(lambda: defaultdict(int))
     for e in emps:
         res = compute_day(e, d, data, now)
+        if res.status == "unmarked" and e.id in silent:
+            res.status = "untracked"
         rows.append({**res.as_dict(), "full_name": e.full_name, "branch": e.branch.name if e.branch else "—",
                      "branch_id": e.branch_id, "position": e.position.title if e.position else "—"})
         b = by_branch[e.branch.name if e.branch else "—"]
         b["total"] += 1
         b[res.status] += 1
-        if res.status in PRESENT:
+        if came(res.status, res.check_in):
             b["came"] += 1
     totals = defaultdict(int)
     for r in rows:
         totals[r["status"]] += 1
-    scheduled = sum(1 for r in rows if r["status"] != "off")
-    came = sum(totals[s] for s in PRESENT)
+    scheduled = sum(1 for r in rows if r["status"] not in NOT_SCHEDULED)
+    n_came = sum(1 for r in rows if came(r["status"], r["check_in"]))
     return {
         "date": d.isoformat(),
         "total": len(rows),
         "scheduled": scheduled,
-        "came": came,
-        "late": totals["late"],
+        "came": n_came,
+        "late": sum(1 for r in rows if was_late(r["status"], r["late_min"])),
         "unmarked": totals["unmarked"],
         "absent": totals["absent"],
         "leave": totals["leave"],
         "off": totals["off"],
         "needs_review": totals["needs_review"],
+        "untracked": [r["full_name"] for r in rows if r["status"] == "untracked"],
         "conflict": totals["conflict"],
         "on_shift": totals["on_shift"],
         "by_branch": {k: dict(v) for k, v in sorted(by_branch.items())},
@@ -208,7 +240,7 @@ def day_summary(db: Session, scope: Scope, d: date, branch_id: int | None = None
 
 
 CODES = {"present": "+", "late": "L", "on_shift": "~", "absent": "A", "leave": "V", "unmarked": "?",
-         "off": "·", "needs_review": "R", "conflict": "!", "not_employed": " "}
+         "off": "·", "needs_review": "R", "conflict": "!", "not_employed": " ", "untracked": "–"}
 
 
 def month_tabel(db: Session, scope: Scope, month: str, branch_id: int | None = None, now: datetime | None = None) -> dict:
@@ -228,7 +260,7 @@ def month_tabel(db: Session, scope: Scope, month: str, branch_id: int | None = N
                 worked += res.worked_hours
                 worked_days += 1
                 overtime += res.overtime_hours
-            late_days += res.status == "late"
+            late_days += was_late(res.status, res.late_min)
             unknown += res.status == "unmarked" and sch.is_workday(e, d) and d <= (now or datetime.now()).date()
             review += res.status in ("needs_review", "conflict")
         out.append({"employee_id": e.id, "full_name": e.full_name, "branch": e.branch.name if e.branch else "—",
@@ -237,6 +269,9 @@ def month_tabel(db: Session, scope: Scope, month: str, branch_id: int | None = N
                     "unknown_days": unknown, "review_days": review, "overtime_hours": round(overtime, 2),
                     "norm_hours": sch.norm_hours(e, month)})
     return {"month": month, "days": [d.day for d in days], "rows": out}
+
+
+came_ = came  # attendance_rate has a local counter named `came`
 
 
 def attendance_rate(db: Session, scope: Scope, days: int, branch_id: int | None = None, today: date | None = None) -> dict:
@@ -253,9 +288,9 @@ def attendance_rate(db: Session, scope: Scope, days: int, branch_id: int | None 
             if sch.employed_on(e, d) and sch.is_workday(e, d):
                 res = compute_day(e, d, data)
                 scheduled += 1
-                came += res.status in PRESENT
+                came += came_(res.status, res.check_in)
                 miss += res.status in ("absent", "unmarked")
-                late += res.status == "late"
+                late += was_late(res.status, res.late_min)
             d += timedelta(days=1)
         per.append({"full_name": e.full_name, "branch": e.branch.name if e.branch else "—", "missed": miss, "late": late})
     per.sort(key=lambda x: (-x["missed"], -x["late"]))

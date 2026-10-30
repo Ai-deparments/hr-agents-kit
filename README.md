@@ -62,6 +62,21 @@ Hammasi filial bo'yicha ruxsat bilan cheklangan.
 - **Nomzod roziligi.** Shaxsiy ma'lumotlarga rozilik so'raladi; rad etilganlar ma'lumotlari 180 kundan keyin anonimlashtiriladi.
 - **Xavfsizlik auditi:** [docs/SECURITY.md](docs/SECURITY.md).
 
+### v0.3 da yangi
+
+- **Bitta HR agent.** Rahbar, HR va egasi bitta agent bilan gaplashadi (barcha vositalar), xodim — o'z yordamchisi bilan. Tugmalar yo'q: hammasi oddiy so'z bilan.
+- **Agent kontekstni ko'radi.** Javob berilgan (reply) xabarni o'qiydi; vakansiya qoralamasi /start dan keyin ham yo'qolmaydi; til xabar matnidan aniqlanadi (lotin → o'zbek, kirill → rus).
+- **Vakansiyalar.** Agent HR so'zlaridan e'lon yozadi, tahrirlaydi, faqat buyruq bilan chop etadi; ommaviy /jobs sahifasi.
+- **Suhbat vaqtlari va ish taklifi.** HR vaqtlarni qo'shadi → nomzod botda raqam yozib tanlaydi → 2 soat oldin eslatma. Taklifni «qabul qilaman» deb qabul qilsa — xodim kartasi (sinov muddati) va onboarding kursi avtomatik.
+- **HR hujjatlar (PDF).** Tahrirlanadigan shablonlar: ish joyidan ma'lumotnoma, ishga qabul va ta'til buyruqlari. Noma'lum maydon bo'sh chiziq bo'lib qoladi — hech narsa o'ylab topilmaydi.
+- **Onboarding materiallari.** Video va yo'riqnomalar lavozim/bo'lim bo'yicha, kunma-kun kurs, «ko'rdim» belgisi, suhbat eslatmalari.
+- **Guruh mavzulari bo'yicha hisobotlar.** Bot forum-guruhdagi mavzu nomlarini o'zi aniqlaydi va har bir hisobotni o'z mavzusiga yuboradi (davomat, rekruting, onboarding, oylik, tahlil) — ertalab va kechqurun; aytadigan narsa bo'lmasa yubormaydi.
+- **Telefon uchun format.** Rich-xabarlar: sarlavha, qisqa ro'yxatlar, keng jadvallarsiz.
+- **Haftalik CEO hisoboti** (rich + Excel 3 varaq) va **intizom eslatmalari**: dushanba kuni qoralama, HR tasdiqlamaguncha hech kimga yuborilmaydi.
+- **Integratsiyalar:** TimePay (Face ID davomat, jarima/bonus), Smartup (savdo), hh.uz (rezyume qidirish, faqat o'qish), KPI va ABC tahlil.
+- **Panel:** foydalanuvchilar, botga ruxsat so'rovlari (begona odamlarga bot javob bermaydi), rollar konstruktori, bo'limlar.
+- **Davomat aniqroq:** kirgan, lekin chiqishni belgilamagan xodim «keldi» deb hisoblanadi; 30 kun belgisiz xodim foizga kirmaydi va alohida ko'rsatiladi.
+
 ### Qoidalar
 
 - **7 qarorni faqat inson qabul qiladi**: oylikni tasdiqlash, ushlab qolish, shartnomani o'zgartirish, ishga olish, bo'shatish, ommaviy xabar va arizani tasdiqlash.
@@ -157,6 +172,21 @@ Stek va kod qoidalari: [`.claude/skills/default-stack`](.claude/skills/default-s
 - **Сигналы риска увольнения.** Видит только HR; это повод для разговора, а не решение.
 - **Согласие кандидата.** Бот спрашивает согласие на обработку персональных данных; данные отклонённых обезличиваются через 180 дней.
 - **Аудит безопасности:** [docs/SECURITY.md](docs/SECURITY.md).
+
+### Новое в v0.3
+
+- **Один HR-агент.** Руководители, HR и владелец говорят с одним агентом (все инструменты), сотрудник — со своим помощником. Никаких кнопок: всё обычными словами.
+- **Агент видит контекст.** Читает сообщение, на которое ответили (reply); черновик вакансии не теряется после /start; язык — по тексту сообщения (латиница → узбекский, кириллица → русский).
+- **Вакансии.** Агент пишет объявление из слов HR, правит, публикует только по команде; публичная страница /jobs.
+- **Слоты собеседований и оффер.** HR добавляет время → кандидат выбирает номер в боте → напоминание за 2 часа. Пишет «qabul qilaman» на оффер — создаётся карточка сотрудника (испытательный срок) и курс онбординга.
+- **HR-документы (PDF).** Редактируемые шаблоны: справка с места работы, приказы о приёме и об отпуске. Неизвестные поля остаются пустой строкой — ничего не выдумывается.
+- **Материалы онбординга.** Видео и инструкции по должности/отделу, курс по дням, отметка «ko'rdim», напоминания о беседах.
+- **Отчёты по темам группы.** Бот сам узнаёт названия тем в форум-группе и шлёт каждый отчёт в свою тему (посещаемость, рекрутинг, онбординг, зарплата, аналитика) — утром и вечером; если сказать нечего — не шлёт.
+- **Формат под телефон.** Rich-сообщения: заголовок, короткие списки, без широких таблиц.
+- **Недельный CEO-дайджест** (rich + Excel на 3 листа) и **напоминания о дисциплине**: черновики по понедельникам, без подтверждения HR никому не уходят.
+- **Интеграции:** TimePay (Face ID, штрафы/бонусы), Smartup (продажи), hh.uz (поиск резюме, только чтение), KPI и ABC-анализ.
+- **Панель:** пользователи, запросы доступа к боту (незнакомым бот не отвечает), конструктор ролей, отделы.
+- **Точнее посещаемость:** отметил приход без ухода — «пришёл»; кто 30 дней без отметок — не входит в процент и показывается отдельно.
 
 ### Принципы
 

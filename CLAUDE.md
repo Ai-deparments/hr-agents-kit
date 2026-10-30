@@ -5,5 +5,6 @@
 - Every service takes a `Scope`. A new agent tool must declare `min_role` (and `needs_payroll` if it touches money).
 - Agents never perform the 7 human-only actions. They call `request_human_action`.
 - Run `cd backend; .venv\Scripts\python -m pytest -q` and `cd web; npm run build` after changes.
+- Telegram messages and reports follow the `telegram-rich-format` skill (helpers in `services/tg.py`); every Excel report follows `excel-report-design` (DASHBOARD / DETAILED DATA / ANALYTICS, helpers in `services/xlsx_style.py`).
 - Before shipping, run the `security-audit` skill; for a deep audit, also run `cloudflare-security-audit`.
 - READMEs are in Uzbek + Russian (`README.md`); the English version is in `README.en.md`.

@@ -13,3 +13,4 @@ python-multipart>=0.0.9
 httpx>=0.27
 pytest>=8
 aiohttp>=3.14.3
+fpdf2>=2.8

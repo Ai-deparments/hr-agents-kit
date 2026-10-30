@@ -14,10 +14,10 @@ from sqlalchemy.orm import Session
 from .auth import hash_password
 from .config import cfg
 from .db import SessionLocal, init_db
-from .models import (AttendanceEvent, Branch, BranchLead, Candidate, Document, Employee, LeadReport, LeaveRequest,
-                     OnboardingPlan, PayrollEntry, Position, Region, SalesRecord, Sop, User, Vacancy)
+from .models import (AttendanceEvent, Branch, BranchLead, Candidate, Department, Document, Employee, KpiMetric, KpiValue,
+                     LeadReport, LeaveRequest, OnboardingPlan, PayrollEntry, Position, Region, Registration, SalesRecord, Sop, User, Vacancy)
 from .services import onboarding, recruiting, schedules
-from .rbac import Scope
+from .rbac import Scope, seed_roles
 
 FIRST = ["Dilnoza", "Aziza", "Jasur", "Sardor", "Malika", "Nodira", "Bekzod", "Kamola", "Otabek", "Shahnoza", "Ulugbek",
          "Gulnora", "Javlon", "Madina", "Sherzod", "Zarina", "Rustam", "Feruza", "Akmal", "Laylo", "Timur", "Sevara",
@@ -43,6 +43,7 @@ def load_dictionaries(db: Session) -> None:
 
 
 def ensure_admin(db: Session) -> None:
+    seed_roles(db)
     if not db.scalar(select(User).where(User.username == "admin")):
         pw = os.getenv("ADMIN_PASSWORD") or ("admin12345" if os.getenv("DEBUG") == "1" else "")
         if len(pw) < 10:
@@ -73,12 +74,13 @@ def demo(db: Session, today: date | None = None) -> None:
     staff = []
     # P01 is 24/7: pharmacists on 24/48 shifts offset so one is always on duty
     head1 = emp("P01", "head", 9_000_000, tg=1001)
-    staff += [head1] + [emp("P01", "pharmacist", 6_500_000, "sutki_1_2", 300 - i * 40, "hourly" if i == 2 else "monthly", i)
-                        for i in range(3)]
+    # hourly / daily people store a rate per hour / per day, not a monthly salary
+    staff += [head1] + [emp("P01", "pharmacist", 40_000 if i == 2 else 6_500_000, "sutki_1_2", 300 - i * 40,
+                            "hourly" if i == 2 else "monthly", i) for i in range(3)]
     staff += [emp("P01", "cashier", 4_500_000, "shift_2_2", 200, anchor_shift=0), emp("P01", "cashier", 4_500_000, "shift_2_2", 25, anchor_shift=2, status="probation")]
     head2 = emp("P02", "head", 8_500_000, "day_6x", tg=1002)
     staff += [head2] + [emp("P02", "pharmacist", 6_000_000, "day_6x", d) for d in (500, 50, 12)]
-    staff += [emp("P02", "cashier", 4_200_000, "day_6x", 90), emp("P02", "cleaner", 2_800_000, "day_6x", 700, "daily")]
+    staff += [emp("P02", "cashier", 4_200_000, "day_6x", 90), emp("P02", "cleaner", 120_000, "day_6x", 700, "daily")]
     head3 = emp("P03", "head", 8_000_000, "day_6x", tg=1003)
     staff += [head3] + [emp("P03", "provisor", 7_000_000, "day_6x", d) for d in (800, 40)]
     staff += [emp("P03", "cashier", None, "day_6x", 15, status="probation")]  # unknown salary -> shows as '—'
@@ -180,9 +182,55 @@ def demo(db: Session, today: date | None = None) -> None:
         for e in staff[:6]:
             db.add(SopAck(sop_id=s.id, employee_id=e.id, version=sop_version(s)))
 
+    deps = [Department(name=n, description=d) for n, d in [("HR", "Xodimlar bo'limi / Отдел кадров"),
+                                                           ("Savdo / Продажи", "Filiallar va sotuv"),
+                                                           ("Moliya / Финансы", "Buxgalteriya va hisob-kitob"),
+                                                           ("Logistika", "Yetkazib berish")]]
+    db.add_all(deps)
+    db.flush()
+    for e in staff:
+        code = e.position.code
+        e.department_id = (deps[0] if code == "hr" else deps[2] if code == "accountant" else
+                           deps[3] if code == "courier" else deps[1]).id
+        if e.telegram_id:
+            e.bot_functions = ["helpdesk", "attendance"] + (["onboarding"] if code in ("head", "hr") else [])
+    # KPI: three company-wide metrics + one for pharmacists, values for the last 3 months
+    mets = [KpiMetric(name="Sotuv rejasi · План продаж", unit="%", direction="up", target=100, weight=50),
+            KpiMetric(name="Mijoz bahosi · Оценка клиента", unit="ball", direction="up", target=90, weight=30),
+            KpiMetric(name="Kechikishlar · Опоздания", unit="marta", direction="down", target=2, weight=20),
+            KpiMetric(name="Retsept xatolari · Ошибки рецептов", unit="ta", direction="down", target=1, weight=20,
+                      position_id=pos["pharmacist"].id)]
+    db.add_all(mets)
+    db.flush()
+    for back in range(3):
+        y, m = today.year, today.month - back
+        if m <= 0:
+            y, m = y - 1, m + 12
+        mon = f"{y}-{m:02d}"
+        for e in staff:
+            talent = (e.id * 37) % 100 / 100  # stable per person: some are consistently strong
+            for mt in mets:
+                if mt.position_id and mt.position_id != e.position_id:
+                    continue
+                if back == 0 and rnd.random() < 0.15:
+                    continue  # current month not fully filled yet
+                if mt.direction == "up":
+                    val = round(mt.target * (0.55 + 0.7 * talent + rnd.uniform(-0.1, 0.1)), 1)
+                else:
+                    val = float(max(0, round((1.6 - talent) * mt.target + rnd.uniform(-1, 1))))
+                db.add(KpiValue(employee_id=e.id, metric_id=mt.id, month=mon, value=val, author="seed"))
+
+    db.add_all([Registration(telegram_id=3001, tg_username="aziz_t", full_name="Aziz Tursunov", position_text="Kassir",
+                             region_text="Toshkent"),
+                Registration(telegram_id=3002, full_name="Gulchehra Ahmedova", position_text="Farmatsevt",
+                             region_text="Samarqand"),
+                Registration(telegram_id=3003, tg_username="shoh_k", full_name="Shohruh Komilov", position_text="Kuryer",
+                             region_text="Toshkent")])
+
     pw = os.getenv("DEMO_PASSWORD", "demo12345")
     for u, role, scope_codes, pay in [("hr", "hr_manager", None, False), ("buh", "payroll", None, True),
-                                      ("ceo", "executive", None, True), ("regional", "manager", ["P01", "P02"], False),
+                                      ("ceo", "ceo", None, True), ("director", "executive", None, True),
+                                      ("regional", "manager", ["P01", "P02"], False),
                                       ("recruiter", "recruiter", None, False)]:
         db.add(User(username=u, full_name=u.title(), password_hash=hash_password(pw), role=role,
                     branch_scope=[br[c].id for c in scope_codes] if scope_codes else None, can_see_payroll=pay))

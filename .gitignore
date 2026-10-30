@@ -12,3 +12,4 @@ backend/.venv/
 web/node_modules/
 web/dist/
 *.db
+data/uploads/

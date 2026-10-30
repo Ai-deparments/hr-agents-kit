@@ -16,6 +16,9 @@ branding:
   primary_color: "#0F766E"
   accent_color: "#F59E0B"
 
+bot:
+  welcome_sticker: ""           # sticker file_id sent on /start to new people (empty = no sticker)
+
 regions:
   - { code: TAS, name: "Tashkent" }
   - { code: SAM, name: "Samarkand" }
@@ -79,14 +82,15 @@ limits:                       # OWASP LLM10 — cap model usage per person
 
 payroll:
   kpi_cap: 1.2
+  kpi_share_of_base: 0.2      # KPI part of pay at 100% score = base salary × this
   late_penalty: { enabled: false, grace_min: 15, per_30_min_share_of_hour: 0.5, max_share_of_salary: 0.10 }
   sales_percent: { enabled: true, default_rate: 0.01 }   # % of personal sales, from CSV/ERP import
   payday: 10                  # day of month salary is paid (precheck reminder 2 days before)
   allowances: [transport, meal, phone]
 
 reports:
-  morning_at: "09:00"
-  evening_at: "18:30"
+  morning_at: "10:00"
+  evening_at: "21:00"
   per_branch_to_heads: true   # each head gets only their pharmacy
 
 onboarding:

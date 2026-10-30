@@ -76,7 +76,7 @@ export default function MiniApp() {
   }, []);
 
   if (err) return <div className="mini"><h1>HR</h1><div className="error" style={{ marginTop: 12 }}>{err}</div></div>;
-  if (!ready || !me) return <div className="mini muted">Loading…</div>;
+  if (!ready || !me) return <div className="mini muted">{t("c_loading")}</div>;
   const lead = me.is_lead || ["hr_head", "owner"].includes(me.role);
   if (!me.linked && !lead) return <div className="mini"><LinkFlow onDone={loadMe} /></div>;
 
@@ -109,6 +109,7 @@ function useToast() {
 
 /* ---------- first-time link: branch -> name -> last 4 phone digits ---------- */
 function LinkFlow({ onDone }: { onDone: () => void }) {
+  const t = useT();
   const [branches, setBranches] = useState<any[]>([]);
   const [branch, setBranch] = useState<any>(null);
   const [people, setPeople] = useState<any[]>([]);
@@ -120,17 +121,17 @@ function LinkFlow({ onDone }: { onDone: () => void }) {
   useEffect(() => { if (branch) api<any[]>(`/api/miniapp/link/people?branch_id=${branch.id}`, mini).then(setPeople).catch((e) => setErr(e.message)); }, [branch]);
   return (
     <div className="stack" style={{ gap: 14 }}>
-      <h1>Find yourself</h1>
-      <p className="muted" style={{ margin: 0 }}>Once: choose your branch, then your name. Your Telegram is linked to your card.</p>
+      <h1>{t("ma_findYourself")}</h1>
+      <p className="muted" style={{ margin: 0 }}>{t("ma_linkNote")}</p>
       <Err e={err} />
       {!branch && branches.map((b) => <button key={b.id} className="person" style={{ textAlign: "left", cursor: "pointer" }} onClick={() => setBranch(b)}><b>{b.name}</b><span className="muted small">{b.city}</span></button>)}
       {branch && !person && <>
         <div className="row"><button className="btn sm" onClick={() => setBranch(null)}>←</button><b>{branch.name}</b></div>
-        <input placeholder="Search name…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <input placeholder={t("ma_searchName")} value={q} onChange={(e) => setQ(e.target.value)} />
         {people.filter((p) => p.full_name.toLowerCase().includes(q.toLowerCase())).map((p) => (
           <button key={p.id} className="person" style={{ textAlign: "left", cursor: "pointer" }} onClick={() => setPerson(p)}><b>{p.full_name}</b></button>
         ))}
-        {people.length === 0 && <div className="muted">Nobody to link here — ask HR.</div>}
+        {people.length === 0 && <div className="muted">{t("ma_nobody")}</div>}
       </>}
       {person && (
         <form className="stack" onSubmit={async (e) => {
@@ -139,8 +140,8 @@ function LinkFlow({ onDone }: { onDone: () => void }) {
           catch (x: any) { setErr(x.message); }
         }}>
           <div className="row"><button type="button" className="btn sm" onClick={() => setPerson(null)}>←</button><b>{person.full_name}</b></div>
-          <label className="field">Last 4 digits of your phone<input inputMode="numeric" pattern="\d{4}" maxLength={4} value={digits} onChange={(e) => setDigits(e.target.value.replace(/\D/g, ""))} /></label>
-          <button className="btn primary" disabled={digits.length !== 4}>Link my Telegram</button>
+          <label className="field">{t("ma_last4")}<input inputMode="numeric" pattern="\d{4}" maxLength={4} value={digits} onChange={(e) => setDigits(e.target.value.replace(/\D/g, ""))} /></label>
+          <button className="btn primary" disabled={digits.length !== 4}>{t("ma_linkBtn")}</button>
         </form>
       )}
     </div>
@@ -185,7 +186,7 @@ function MeView({ me, reload }: { me: any; reload: () => void }) {
           setToast(x.message);
         } else if (x.detail?.need === "location") {
           const loc = await getLocation();
-          if (!loc) { setToast("📍 Joylashuvga ruxsat bering / Разрешите доступ к геолокации"); return; }
+          if (!loc) { setToast(t("ma_allowLoc")); return; }
           done(kind, await send({ kind, ...loc }));
         } else throw x;
       }
@@ -202,24 +203,24 @@ function MeView({ me, reload }: { me: any; reload: () => void }) {
         <button className="big-btn out" disabled={busy} onClick={() => check("out")}>{t("checkOut")}</button>
       </div>
       {needCode && <form className="card stack" style={{ gap: 8 }} onSubmit={(e) => { e.preventDefault(); check(needCode, code); }}>
-        <b>Mudir ekranidagi 6 xonali kod / 6-значный код с экрана заведующего</b>
+        <b>{t("ma_codeLabel")}</b>
         <input inputMode="numeric" pattern="[0-9]{6}" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
           style={{ fontSize: 28, textAlign: "center", letterSpacing: 8, fontFamily: "var(--mono)" }} autoFocus />
         <button className="btn primary" disabled={busy || code.length !== 6}>OK</button>
       </form>}
-      {cfg && cfg.mode !== "none" && <div className="muted small">🔒 {cfg.mode === "qr" ? "QR" : cfg.mode === "geo" ? "📍 GPS" : "📍 GPS / QR"} — joyda ekaningiz tekshiriladi · место отметки проверяется</div>}
-      {me.open_shift_from_yesterday && <div className="note">Your shift from yesterday is still open — press “{t("checkOut")}” when you leave.</div>}
+      {cfg && cfg.mode !== "none" && <div className="muted small">🔒 {cfg.mode === "qr" ? "QR" : cfg.mode === "geo" ? "📍 GPS" : "📍 GPS / QR"} — {t("ma_verified")}</div>}
+      {me.open_shift_from_yesterday && <div className="note">{t("ma_openShift").replace("{b}", t("checkOut"))}</div>}
       <div className="card stack" style={{ gap: 6 }}>
         <div className="row"><b>{t("today")}</b><span className="spacer" /><Status s={d.status} /></div>
-        <div className="row small"><span className="muted">In</span><span className="mono">{d.check_in?.slice(11) || "—"}</span>
-          <span className="muted">Out</span><span className="mono">{d.check_out?.slice(11) || "—"}</span>
-          <span className="muted">Hours</span><span className="mono">{d.worked_hours ?? "—"}</span></div>
-        {d.late_min > 0 && <div className="small" style={{ color: "var(--warn)" }}>Late {d.late_min} min</div>}
+        <div className="row small"><span className="muted">{t("at_in")}</span><span className="mono">{d.check_in?.slice(11) || "—"}</span>
+          <span className="muted">{t("at_out")}</span><span className="mono">{d.check_out?.slice(11) || "—"}</span>
+          <span className="muted">{t("c_hours")}</span><span className="mono">{d.worked_hours ?? "—"}</span></div>
+        {d.late_min > 0 && <div className="small" style={{ color: "var(--warn)" }}>{t("c_late")} {d.late_min} {t("c_minUnit")}</div>}
       </div>
       {me.month && <div className="grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
-        <div className="card tile"><div className="label">Hours</div><div className="value" style={{ fontSize: 20 }}>{me.month.worked_hours}</div></div>
-        <div className="card tile"><div className="label">Days</div><div className="value" style={{ fontSize: 20 }}>{me.month.worked_days}</div></div>
-        <div className="card tile"><div className="label">Late</div><div className="value" style={{ fontSize: 20 }}>{me.month.late_days}</div></div>
+        <div className="card tile"><div className="label">{t("c_hours")}</div><div className="value" style={{ fontSize: 20 }}>{me.month.worked_hours}</div></div>
+        <div className="card tile"><div className="label">{t("c_days")}</div><div className="value" style={{ fontSize: 20 }}>{me.month.worked_days}</div></div>
+        <div className="card tile"><div className="label">{t("c_late")}</div><div className="value" style={{ fontSize: 20 }}>{me.month.late_days}</div></div>
       </div>}
       <Toast text={toast} />
     </div>
@@ -272,11 +273,11 @@ function LeadReport() {
       setState((s) => ({ ...s, [r.employee_id]: t("saved") }));
       load();
     } catch (x: any) {
-      setState((s) => ({ ...s, [r.employee_id]: "⚠ " + (x.status === 409 ? "Someone just changed this — tap again" : x.message) }));
+      setState((s) => ({ ...s, [r.employee_id]: "⚠ " + (x.status === 409 ? t("ma_conflict409") : x.message) }));
     }
   };
   const rows = (data?.rows || []).filter((r: any) => !q || r.full_name.toLowerCase().includes(q.toLowerCase()));
-  const tiles = data ? [["Keldi", data.came], ["Kelmadi", data.absent], ["Not marked", data.unmarked], ["Late", data.late]] : [];
+  const tiles = data ? [[t("came"), data.came], [t("absent"), data.absent], [t("at_notMarked"), data.unmarked], [t("c_late"), data.late]] : [];
 
   return (
     <div className="stack" style={{ gap: 12 }}>
@@ -291,8 +292,8 @@ function LeadReport() {
       {data && <div className="grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
         {tiles.map(([l, v]) => <div key={l} className="card" style={{ padding: 10, textAlign: "center" }}><div className="num" style={{ fontSize: 20, fontWeight: 800 }}>{v}</div><div className="muted small">{l}</div></div>)}
       </div>}
-      {data?.locked && <div className="note">Month is closed — view only.</div>}
-      {(data?.rows.length || 0) > 15 && <input placeholder="Search name…" value={q} onChange={(e) => setQ(e.target.value)} />}
+      {data?.locked && <div className="note">{t("ma_monthClosed")}</div>}
+      {(data?.rows.length || 0) > 15 && <input placeholder={t("ma_searchName")} value={q} onChange={(e) => setQ(e.target.value)} />}
       {rows.map((r: any) => {
         const byLead = r.source === "lead";
         const came = byLead && ["present", "late"].includes(r.status);
@@ -305,14 +306,14 @@ function LeadReport() {
             <div className="top">
               <div style={{ flex: 1 }}>
                 <b>{r.full_name}</b>
-                <div className="muted small">{r.position}{r.check_in ? ` · in ${r.check_in.slice(11)}` : " · no self check-in"}
-                  {r.late_min ? ` · late ${r.late_min}m` : ""}{r.warnings_month ? ` · ⚠ ${r.warnings_month} warnings` : ""}</div>
+                <div className="muted small">{r.position}{r.check_in ? ` · ${t("ma_inAt")} ${r.check_in.slice(11)}` : ` · ${t("ma_noSelf")}`}
+                  {r.late_min ? ` · ${t("st_late")} ${r.late_min}${t("c_mUnit")}` : ""}{r.warnings_month ? ` · ⚠ ${r.warnings_month} ${t("ma_warnings")}` : ""}</div>
               </div>
               <Status s={r.status} />
             </div>
-            {locked ? <div className="muted small">{r.source === "hr" ? "HR corrected" : r.source === "leave" ? `On ${r.leave_kind}` : "Closed"}</div>
-              : r.status === "off" && !expanded[r.employee_id] ? <div className="row small"><span className="muted">Rest day by schedule</span><span className="spacer" />
-                <button className="btn sm" onClick={() => setExpanded((x) => ({ ...x, [r.employee_id]: true }))}>Mark anyway</button></div> : <>
+            {locked ? <div className="muted small">{r.source === "hr" ? t("ma_hrCorrected") : r.source === "leave" ? `${t("st_leave")}${r.leave_kind ? ` · ${r.leave_kind}` : ""}` : t("ma_closed")}</div>
+              : r.status === "off" && !expanded[r.employee_id] ? <div className="row small"><span className="muted">{t("ma_restDay")}</span><span className="spacer" />
+                <button className="btn sm" onClick={() => setExpanded((x) => ({ ...x, [r.employee_id]: true }))}>{t("ma_markAnyway")}</button></div> : <>
               {r.pay_type === "daily" ? (
                 <div className="seg" style={{ gridTemplateColumns: "1fr 1fr 1fr" }}>
                   <button className={came && r.worked_hours >= (r.planned_hours || 8) ? "on-came" : ""} onClick={() => save(r, "came", r.planned_hours || 8)}>{t("fullDay")}</button>
@@ -326,7 +327,7 @@ function LeadReport() {
                 </div>
                 <div className="hours">
                   <button className="btn sm" onClick={() => setH(h - 0.5)}>−</button>
-                  <span className="val">{h} h</span>
+                  <span className="val">{h} {t("c_hUnit")}</span>
                   <button className="btn sm" onClick={() => setH(h + 0.5)}>+</button>
                   {[8, 12, 24].map((v) => <button key={v} className={`pill ${h === v ? "active" : ""}`} onClick={() => setH(v)}>{v}</button>)}
                   {came && h !== r.worked_hours && <button className="btn sm primary" onClick={() => save(r, "came")}>{t("save")}</button>}
@@ -340,7 +341,7 @@ function LeadReport() {
           </div>
         );
       })}
-      {data && rows.length === 0 && <div className="muted">Nobody in this branch.</div>}
+      {data && rows.length === 0 && <div className="muted">{t("ma_nobodyBranch")}</div>}
     </div>
   );
 }
@@ -365,15 +366,15 @@ function LeadMonth() {
       <Err e={err || e2} />
       <div className="pills">{months.map((m) => <button key={m} className={`pill ${m === month ? "active" : ""}`} onClick={() => setMonth(m)}>{m}</button>)}</div>
       {data && <div className="card stack" style={{ gap: 4 }}>
-        <div className="muted small">On hand</div>
-        <div className="num" style={{ fontSize: 26, fontWeight: 800 }}>{money(data.fund)} <span className="small muted">UZS</span></div>
-        <span className={`badge ${["approved", "paid", "closed"].includes(data.status) ? "b-ok" : "b-warn"}`}>{["approved", "paid", "closed"].includes(data.status) ? "Official" : "Estimate — HR approves at month end"}</span>
-        <div className="row small muted">bonus {money(sum("bonus"))} · advance {money(sum("advance"))} · penalty {money(sum("penalty"))}</div>
-        {data.unknown_salary > 0 && <div className="small" style={{ color: "var(--warn)" }}>Salary unknown for {data.unknown_salary} person(s) — not in total</div>}
+        <div className="muted small">{t("ma_onHand")}</div>
+        <div className="num" style={{ fontSize: 26, fontWeight: 800 }}>{money(data.fund)} <span className="small muted">{t("c_som")}</span></div>
+        <span className={`badge ${["approved", "paid", "closed"].includes(data.status) ? "b-ok" : "b-warn"}`}>{["approved", "paid", "closed"].includes(data.status) ? t("ma_official") : t("ma_estimateLong")}</span>
+        <div className="row small muted">{t("bonus")} {money(sum("bonus"))} · {t("advance")} {money(sum("advance"))} · {t("penalty")} {money(sum("penalty"))}</div>
+        {data.unknown_salary > 0 && <div className="small" style={{ color: "var(--warn)" }}>{t("ma_salaryUnknown").replace("{n}", String(data.unknown_salary))}</div>}
       </div>}
       {data?.rows.map((r: any) => (
         <button key={r.employee_id} className="person" style={{ textAlign: "left", cursor: "pointer" }} onClick={() => setPerson(r)}>
-          <div className="top"><div style={{ flex: 1 }}><b>{r.full_name}</b><div className="muted small">{r.position} · {r.worked_hours}/{r.norm_hours} h</div></div>
+          <div className="top"><div style={{ flex: 1 }}><b>{r.full_name}</b><div className="muted small">{r.position} · {r.worked_hours}/{r.norm_hours} {t("c_hUnit")}</div></div>
             <div className="num" style={{ fontWeight: 800 }}>{money(r.total)}</div></div>
           <div className="row small muted">{t("advance")} {money(r.advance)} · {t("penalty")} {money(r.penalty)}{r.warnings ? ` · ⚠ ${r.warnings}` : ""}</div>
         </button>
@@ -395,17 +396,17 @@ function PersonPage({ row, month, official, onBack }: { row: any; month: string;
   const [reason, setReason] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [toast, setToast] = useToast();
-  const lines: [string, unknown][] = [["Hours / norm", `${row.worked_hours} / ${row.norm_hours}`], ["Salary (contract)", money(row.base)], ["Accrued", money(row.accrued)],
-    ["Bonus", money(row.bonus)], ["KPI bonus", money(row.kpi)], ["Sales bonus", money(row.sales_bonus)], ["Allowances", money(row.allowances)],
-    ["Advance", money(row.advance)], ["Penalty", money(row.penalty)], ["Late penalty (auto)", money(row.late_penalty)], ["Other deductions", money(row.other)]];
+  const lines: [string, unknown][] = [[t("pr_hoursNorm"), `${row.worked_hours} / ${row.norm_hours}`], [t("ma_salaryContract"), money(row.base)], [t("pr_accrued"), money(row.accrued)],
+    [t("bonus"), money(row.bonus)], [t("ma_kpiBonus"), money(row.kpi)], [t("ma_salesBonus"), money(row.sales_bonus)], [t("ma_allowances"), money(row.allowances)],
+    [t("advance"), money(row.advance)], [t("penalty"), money(row.penalty)], [t("ma_latePenalty"), money(row.late_penalty)], [t("ma_otherDed"), money(row.other)]];
   const reset = () => { setKind(null); setStep(1); setAmount(""); setReason(""); setErr(null); };
   return (
     <div className="stack" style={{ gap: 12 }}>
       <div className="row"><button className="btn sm" onClick={onBack}>←</button><b>{row.full_name}</b></div>
       <div className="card" style={{ textAlign: "center" }}>
-        <div className="muted small">On hand · {month}</div>
+        <div className="muted small">{t("ma_onHand")} · {month}</div>
         <div className="num" style={{ fontSize: 32, fontWeight: 800 }}>{money(row.total)}</div>
-        <span className={`badge ${official ? "b-ok" : "b-warn"}`}>{official ? "Official" : "Estimate"}</span>
+        <span className={`badge ${official ? "b-ok" : "b-warn"}`}>{official ? t("ma_official") : t("ma_estimate")}</span>
       </div>
       <div className="card stack" style={{ gap: 4 }}>
         {lines.map(([k, v]) => <div key={k} className="row small"><span className="muted">{k}</span><span className="spacer" /><span className="mono">{String(v)}</span></div>)}
@@ -416,12 +417,12 @@ function PersonPage({ row, month, official, onBack }: { row: any; month: string;
         <div className="card stack">
           <b>{t(kind.key)}</b>
           {step === 1 ? <>
-            {kind.money && <label className="field">Amount (UZS)<input inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, ""))} /></label>}
+            {kind.money && <label className="field">{t("pr_amountSom")}<input inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, ""))} /></label>}
             <label className="field">{t("reason")}<textarea rows={2} maxLength={300} value={reason} onChange={(e) => setReason(e.target.value)} /></label>
             <div className="row"><button className="btn" onClick={reset}>{t("cancel")}</button><span className="spacer" />
-              <button className="btn primary" disabled={reason.trim().length < 3 || (kind.money && !Number(amount))} onClick={() => setStep(2)}>Next</button></div>
+              <button className="btn primary" disabled={reason.trim().length < 3 || (kind.money && !Number(amount))} onClick={() => setStep(2)}>{t("ma_next")}</button></div>
           </> : <>
-            <div>{kind.money ? <b className="num">{money(Number(amount))} UZS </b> : null}{t(kind.key).toLowerCase()} — {t("confirm").toLowerCase()}?</div>
+            <div>{kind.money ? <b className="num">{money(Number(amount))} {t("c_som")} </b> : null}{t(kind.key).toLowerCase()} — {t("confirm").toLowerCase()}?</div>
             <div className="muted small">{reason}</div>
             <Err e={err} />
             <div className="row"><button className="btn" onClick={() => setStep(1)}>←</button><span className="spacer" />
@@ -441,6 +442,7 @@ function PersonPage({ row, month, official, onBack }: { row: any; month: string;
 
 /* ---------- team lead: rotating check-in QR (anti-fraud) ---------- */
 function LeadQr() {
+  const t = useT();
   const { branches, branch, setBranch, err } = useBranches();
   const [qr, setQr] = useState<any>(null);
   const [svg, setSvg] = useState("");
@@ -459,12 +461,11 @@ function LeadQr() {
     <div className="stack" style={{ gap: 12, textAlign: "center" }}>
       <BranchPills branches={branches} branch={branch} setBranch={setBranch} />
       <Err e={err || e2} />
-      <div className="muted small">Xodim «Keldim» bosganda shu QR'ni skanerlaydi. Kod har 60 soniyada yangilanadi.<br />
-        Сотрудник сканирует этот QR при «Keldim». Код меняется каждые 60 секунд.</div>
+      <div className="muted small">{t("ma_qrNote")}</div>
       {qr && <>
         <div className="card" style={{ display: "grid", placeItems: "center", padding: 16 }} dangerouslySetInnerHTML={{ __html: svg }} />
         <div style={{ font: "800 40px var(--mono)", letterSpacing: 8 }}>{qr.code}</div>
-        <div className="muted small">{qr.expires_in} s</div>
+        <div className="muted small">{qr.expires_in} {t("c_sUnit")}</div>
       </>}
     </div>
   );

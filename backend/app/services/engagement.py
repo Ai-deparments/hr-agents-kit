@@ -131,7 +131,7 @@ def risk_signals(db: Session, scope: Scope, today: date | None = None) -> list[d
             d = a
             while d <= b:
                 r = att.compute_day(e, d, data)
-                late += r.status == "late"
+                late += att.was_late(r.status, r.late_min)
                 miss += r.status == "absent"
                 d += timedelta(days=1)
             return late, miss

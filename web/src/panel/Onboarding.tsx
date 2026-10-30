@@ -1,10 +1,13 @@
 import { useState } from "react";
 import { api, dash } from "../api";
+import { useT } from "../i18n";
 import { Empty, Err, Light, Modal, Tile, useLoad } from "../ui";
 import { can, usePanel } from "./ctx";
+import { HrDocs } from "./HrDocs";
 
 export function Onboarding() {
   const { me } = usePanel();
+  const t = useT();
   const { data: s, error, reload } = useLoad<any>("/api/onboarding");
   const [open, setOpen] = useState<number | null>(null);
   const [adding, setAdding] = useState(false);
@@ -13,24 +16,24 @@ export function Onboarding() {
   return (
     <div className="stack" style={{ gap: 14 }}>
       {s && <div className="grid tiles">
-        <Tile label="On onboarding" value={s.total} /><Tile label="Behind (red)" value={s.behind} />
-        <Tile label="Without mentor" value={s.no_mentor} /><Tile label="No test after day 25" value={s.no_test} />
+        <Tile label={t("ob_on")} value={s.total} /><Tile label={t("ob_behind")} value={s.behind} />
+        <Tile label={t("ob_noMentor")} value={s.no_mentor} /><Tile label={t("ob_noTest")} value={s.no_test} />
       </div>}
-      <div className="note">Facts only: whether probation is passed is decided by the manager. Score ≥80 good, ≥60 satisfactory, lower — tell the manager.</div>
+      <div className="note">{t("ob_note")}</div>
       <Err e={error || err} />
       <div className="card">
-        <div className="row" style={{ marginBottom: 10 }}><h2 style={{ margin: 0 }}>Plans</h2><span className="spacer" />
-          {can(me, "onboarding") && <button className="btn primary" onClick={() => setAdding(true)}>+ Add to onboarding</button>}</div>
+        <div className="row" style={{ marginBottom: 10 }}><h2 style={{ margin: 0 }}>{t("ob_plans")}</h2><span className="spacer" />
+          {can(me, "onboarding") && <button className="btn primary" onClick={() => setAdding(true)}>{t("ob_addBtn")}</button>}</div>
         {s?.plans.length === 0 && <Empty />}
         <div className="stack">
           {s?.plans.map((p: any) => (
             <div key={p.plan_id} className="person">
               <div className="top" style={{ cursor: "pointer" }} onClick={() => setOpen(open === p.plan_id ? null : p.plan_id)}>
                 <Light c={p.light} />
-                <div style={{ flex: 1 }}><b>{p.full_name}</b><div className="muted small">{dash(p.position)} · {dash(p.branch)} · mentor {dash(p.mentor)}</div></div>
-                <div className="num small" style={{ textAlign: "right" }}>day {p.day} · stage {p.stage}<div><b>{p.progress_pct}%</b> ({p.done}/{p.due})</div></div>
+                <div style={{ flex: 1 }}><b>{p.full_name}</b><div className="muted small">{dash(p.position)} · {dash(p.branch)} · {t("c_mentor")} {dash(p.mentor)}</div></div>
+                <div className="num small" style={{ textAlign: "right" }}>{t("c_day")} {p.day} · {t("c_stage")} {p.stage}<div><b>{p.progress_pct}%</b> ({p.done}/{p.due})</div></div>
               </div>
-              <div className="row small">{Object.entries(p.scores).map(([st, v]: any) => <span key={st} className={`badge ${v.score >= 80 ? "b-ok" : v.score >= 60 ? "b-warn" : "b-bad"}`}>{st}d: {v.score} {v.label}</span>)}</div>
+              <div className="row small">{Object.entries(p.scores).map(([st, v]: any) => <span key={st} className={`badge ${v.score >= 80 ? "b-ok" : v.score >= 60 ? "b-warn" : "b-bad"}`}>{st}{t("c_dUnit")}: {v.score} {v.label}</span>)}</div>
               {open === p.plan_id && (
                 <div className="stack">
                   {p.items.map((i: any) => (
@@ -41,11 +44,11 @@ export function Onboarding() {
                     </label>
                   ))}
                   <div className="row">
-                    <input type="number" min={0} max={100} placeholder="Test score 0–100" value={score[p.plan_id] || ""} onChange={(e) => setScore({ ...score, [p.plan_id]: e.target.value })} style={{ width: 160 }} />
+                    <input type="number" min={0} max={100} placeholder={t("ob_testScore")} value={score[p.plan_id] || ""} onChange={(e) => setScore({ ...score, [p.plan_id]: e.target.value })} style={{ width: 160 }} />
                     <button className="btn" disabled={!score[p.plan_id]} onClick={async () => {
                       try { await api(`/api/onboarding/${p.plan_id}/score`, { body: { score: Number(score[p.plan_id]) } }); setScore({ ...score, [p.plan_id]: "" }); reload(); }
                       catch (x: any) { setErr(x.message); }
-                    }}>Save score (stage {p.stage})</button>
+                    }}>{t("ob_saveScore")} ({t("c_stage")} {p.stage})</button>
                   </div>
                 </div>
               )}
@@ -59,23 +62,24 @@ export function Onboarding() {
 }
 
 function AddPlan({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const t = useT();
   const emps = useLoad<any[]>("/api/employees");
   const [f, setF] = useState<any>({});
   const [err, setErr] = useState<string | null>(null);
   return (
-    <Modal title="Add to onboarding" onClose={onClose}>
+    <Modal title={t("ob_addTitle")} onClose={onClose}>
       <form className="form" onSubmit={async (e) => {
         e.preventDefault();
         try { await api("/api/onboarding", { body: { employee_id: Number(f.employee_id), mentor: f.mentor || null, start_date: f.start_date || null } }); onDone(); onClose(); }
         catch (x: any) { setErr(x.message); }
       }}>
-        <label className="field">Employee<select required value={f.employee_id || ""} onChange={(e) => setF({ ...f, employee_id: e.target.value })}>
-          <option value="">Choose…</option>{emps.data?.filter((e) => e.status !== "fired").map((e) => <option key={e.id} value={e.id}>{e.full_name} — {dash(e.position)}</option>)}</select></label>
-        <label className="field">Mentor<input value={f.mentor || ""} onChange={(e) => setF({ ...f, mentor: e.target.value })} /></label>
-        <label className="field">Start date (default: hire date)<input type="date" value={f.start_date || ""} onChange={(e) => setF({ ...f, start_date: e.target.value })} /></label>
-        <p className="muted small" style={{ margin: 0 }}>The checklist is created from the position template in company.yaml.</p>
+        <label className="field">{t("c_employee")}<select required value={f.employee_id || ""} onChange={(e) => setF({ ...f, employee_id: e.target.value })}>
+          <option value="">{t("c_choose")}</option>{emps.data?.filter((e) => e.status !== "fired").map((e) => <option key={e.id} value={e.id}>{e.full_name} — {dash(e.position)}</option>)}</select></label>
+        <label className="field">{t("ob_mentor")}<input value={f.mentor || ""} onChange={(e) => setF({ ...f, mentor: e.target.value })} /></label>
+        <label className="field">{t("ob_startDate")}<input type="date" value={f.start_date || ""} onChange={(e) => setF({ ...f, start_date: e.target.value })} /></label>
+        <p className="muted small" style={{ margin: 0 }}>{t("ob_templateNote")}</p>
         <Err e={err} />
-        <button className="btn primary">Create plan</button>
+        <button className="btn primary">{t("ob_createPlan")}</button>
       </form>
     </Modal>
   );
@@ -83,52 +87,55 @@ function AddPlan({ onClose, onDone }: { onClose: () => void; onDone: () => void 
 
 export function Documents() {
   const { me } = usePanel();
+  const t = useT();
   const [days, setDays] = useState(60);
   const { data, error, reload } = useLoad<any[]>(`/api/documents/expiring?days=${days}`, []);
   const [adding, setAdding] = useState(false);
-  return (
+  return (<div className="stack" style={{ gap: 14 }}>
+    {can(me, "documents") && <HrDocs />}
     <div className="card">
       <div className="row" style={{ marginBottom: 12 }}>
-        <span className="muted">Expiring within</span>
-        <select value={days} onChange={(e) => setDays(Number(e.target.value))}>{[30, 60, 90, 180].map((d) => <option key={d} value={d}>{d} days</option>)}</select>
-        <span className="spacer" />{can(me, "hr.write") && <button className="btn primary" onClick={() => setAdding(true)}>+ Document</button>}
+        <span className="muted">{t("ob_expWithin")}</span>
+        <select value={days} onChange={(e) => setDays(Number(e.target.value))}>{[30, 60, 90, 180].map((d) => <option key={d} value={d}>{d} {t("c_daysUnit")}</option>)}</select>
+        <span className="spacer" />{can(me, "hr.write") && <button className="btn primary" onClick={() => setAdding(true)}>{t("ob_docBtn")}</button>}
       </div>
       <Err e={error} />
       <div className="table-wrap"><table>
-        <thead><tr><th>Employee</th><th>Branch</th><th>Document</th><th>Expires</th><th className="num">Days left</th></tr></thead>
+        <thead><tr><th>{t("c_employee")}</th><th>{t("c_branch")}</th><th>{t("ob_document")}</th><th>{t("ob_expires")}</th><th className="num">{t("ob_daysLeft")}</th></tr></thead>
         <tbody>{data?.map((d) => (
           <tr key={d.id}><td><b>{d.full_name}</b></td><td>{d.branch}</td><td>{d.title}</td><td className="mono">{d.expires}</td>
-            <td className="num"><span className={`badge ${d.expired ? "b-bad" : d.days_left <= 30 ? "b-warn" : ""}`}>{d.expired ? "expired" : d.days_left}</span></td></tr>
+            <td className="num"><span className={`badge ${d.expired ? "b-bad" : d.days_left <= 30 ? "b-warn" : ""}`}>{d.expired ? t("ob_expired") : d.days_left}</span></td></tr>
         ))}</tbody>
       </table></div>
-      {data?.length === 0 && <Empty text="Nothing expires in this period" />}
+      {data?.length === 0 && <Empty text={t("ob_nothingExp")} />}
       {adding && <AddDoc onClose={() => setAdding(false)} onDone={reload} />}
     </div>
-  );
+  </div>);
 }
 
 function AddDoc({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const t = useT();
   const emps = useLoad<any[]>("/api/employees");
   const cfg = useLoad<any>("/api/config/public");
   const [f, setF] = useState<any>({});
   const [err, setErr] = useState<string | null>(null);
   const set = (k: string) => (e: any) => setF({ ...f, [k]: e.target.value });
   return (
-    <Modal title="Add document" onClose={onClose}>
+    <Modal title={t("ob_addDoc")} onClose={onClose}>
       <form className="form" onSubmit={async (e) => {
         e.preventDefault();
         try { await api("/api/documents", { body: { ...f, employee_id: Number(f.employee_id), issued: f.issued || null, expires: f.expires || null } }); onDone(); onClose(); }
         catch (x: any) { setErr(x.message); }
       }}>
-        <label className="field">Employee<select required value={f.employee_id || ""} onChange={set("employee_id")}><option value="">Choose…</option>
+        <label className="field">{t("c_employee")}<select required value={f.employee_id || ""} onChange={set("employee_id")}><option value="">{t("c_choose")}</option>
           {emps.data?.map((e) => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label>
-        <label className="field">Type<select required value={f.doc_type || ""} onChange={set("doc_type")}><option value="">Choose…</option>
+        <label className="field">{t("c_type")}<select required value={f.doc_type || ""} onChange={set("doc_type")}><option value="">{t("c_choose")}</option>
           {cfg.data?.documents?.map((d: any) => <option key={d.code} value={d.code}>{d.title}</option>)}</select></label>
-        <label className="field">Number<input value={f.number || ""} onChange={set("number")} /></label>
-        <label className="field">Issued<input type="date" value={f.issued || ""} onChange={set("issued")} /></label>
-        <label className="field">Expires<input type="date" value={f.expires || ""} onChange={set("expires")} /></label>
+        <label className="field">{t("ob_number")}<input value={f.number || ""} onChange={set("number")} /></label>
+        <label className="field">{t("ob_issued")}<input type="date" value={f.issued || ""} onChange={set("issued")} /></label>
+        <label className="field">{t("ob_expires")}<input type="date" value={f.expires || ""} onChange={set("expires")} /></label>
         <Err e={err} />
-        <button className="btn primary">Save</button>
+        <button className="btn primary">{t("save")}</button>
       </form>
     </Modal>
   );

@@ -7,10 +7,11 @@ export type Dicts = {
   regions: { id: number; code: string; name: string }[];
   branches: Branch[];
   positions: { id: number; code: string; title: string }[];
+  departments: { id: number; name: string }[];
   schedules: string[];
 };
 
-export const PanelCtx = createContext<{ me: Me; dicts: Dicts }>(null as any);
+export const PanelCtx = createContext<{ me: Me; dicts: Dicts; reloadDicts: () => Promise<unknown>; go: (page: string) => void }>(null as any);
 export const usePanel = () => useContext(PanelCtx);
 
 export function can(me: Me, perm: string) {
