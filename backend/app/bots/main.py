@@ -59,9 +59,11 @@ def _is_addressed(msg: Message, me_username: str) -> bool:
     return False
 
 
-def _answer_sync(agent: str, tg_id: int, text: str, user_key: str | None = None) -> str:
+def _answer_sync(agent: str, tg_id: int, text: str, user_key: str | None = None, group: bool = False) -> str:
     with SessionLocal() as db:
         scope = scope_for_telegram(db, tg_id)
+        if group:  # everyone in the group reads the answer: no salary / payroll amounts there, only in private chat
+            scope.payroll = False
         return run_agent(db, agent, scope, text, user_key=user_key or f"tg:{tg_id}")
 
 
@@ -222,10 +224,12 @@ def agent_router(agent: str | None) -> Router:
         if hr_group:  # one shared conversation per topic, so the agent remembers what was said there
             thread = m.message_thread_id if m.is_topic_message else None
             topic = await asyncio.to_thread(_topic_name, m.chat.id, thread)
-            ask = (f"[HR group, topic: {topic}. Answer for this topic's subject. Written by {m.from_user.full_name}]\n\n"
-                   if topic else f"[HR group. Written by {m.from_user.full_name}]\n\n") + ask
+            ask = (f"[HR group, topic: {topic}. Answer for this topic's subject. Written by {m.from_user.full_name}]\n"
+                   if topic else f"[HR group. Written by {m.from_user.full_name}]\n") + (
+                "[Group chat: never show a person's salary, pay, fines or bonuses here; totals and counts are fine. For "
+                "personal amounts say: «shaxsiy chatda so'rang» / «спросите в личке».]\n\n") + ask
             key = f"grp:{m.chat.id}:{thread or 0}"
-        answer = await asyncio.to_thread(_answer_sync, target, m.from_user.id, ask, key)
+        answer = await asyncio.to_thread(_answer_sync, target, m.from_user.id, ask, key, hr_group)
         await reply_rich(m, answer)
 
     return r

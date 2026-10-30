@@ -32,3 +32,12 @@ def test_group_addressing(monkeypatch):
     assert bot._is_addressed(msg("davom et", reply=N(message_id=9, from_user=me)), "hrbot")       # reply to the bot
     assert not bot._is_addressed(msg("kim kech qoldi?", chat=-200), "hrbot")       # other groups: only on mention
     assert bot._is_addressed(msg("@hrbot kim kech qoldi?", chat=-200), "hrbot")
+
+
+def test_group_answers_have_no_payroll_rights(db, monkeypatch):
+    from app.bots import main as bot
+    seen = {}
+    monkeypatch.setattr(bot, "run_agent", lambda db, agent, scope, text, user_key: seen.update(p=scope.payroll) or "ok")
+    owner = next(iter(bot.settings().owner_ids), None) or 1
+    bot._answer_sync("hr", owner, "oylik qancha?", "grp:-1:2", True)
+    assert seen["p"] is False                                            # group: payroll tools are not offered
