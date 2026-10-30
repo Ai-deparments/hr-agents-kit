@@ -16,7 +16,10 @@ BANNED_TOPICS = ("age", "gender", "nationality", "religion", "marital", "childre
                  "возраст", "национальн", "религи", "замуж", "женат", "дети", "беремен", "внешн",
                  "yoshingiz", "millat", "diningiz", "turmush", "farzand", "homilador")
 
-PHONE_RE = re.compile(r"\+?\d[\d\s\-()]{7,}\d")
+# "+998 90 123 45 67", "(90) 123-45-67", "901234567" — but not money like "4 200 000"
+PHONE_RE = re.compile(r"\+\d{1,3}[\s\-()]*\d(?:[\s\-()]*\d){7,}"
+                      r"|\(?\b\d{2,3}\)?[\s\-]\d{3}[\s\-]\d{2}[\s\-]\d{2}\b"
+                      r"|\b\d{9,12}\b")
 
 
 def missing_fields(v: dict) -> list[str]:
@@ -75,7 +78,8 @@ def open_vacancy(db: Session, scope: Scope, v: Vacancy) -> Vacancy:
     sla = cfg("recruiting.sla_days_by_position", {}) or {}
     v.sla_days = int(sla.get(v.position_code, cfg("recruiting.sla_days_default", 21)))
     v.status, v.opened_at = "open", date.today()
-    v.ad_text = render_ad(v)
+    if not v.ad_custom:  # a chosen / edited ad text (checked by ad_check) is kept as is
+        v.ad_text = render_ad(v)
     audit(db, scope, "vacancy_open", f"vacancy:{v.id}")
     return v
 

@@ -2,14 +2,16 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 import { useT } from "../i18n";
 import { Ic } from "../icons";
-import { Err, Modal } from "../ui";
+import { Err, Modal, useLoad } from "../ui";
 import { usePanel } from "./ctx";
 
 export type Vac = {
   id: number; title: string; branch_id: number | null; branch: string | null; status: string; salary_text: string | null;
   schedule_text: string | null; intro: string | null; duties: string | null; requirements: string | null; benefits: string | null;
   ad_text: string | null; public: boolean; is_template: boolean; published: Record<string, string>; missing: string[];
-  apply_url: string | null; channel_configured: boolean;
+  apply_url: string | null; channel_configured: boolean; ad_custom: boolean;
+  variants: { n: number; text: string; source: string; chosen: boolean }[];
+  jobs: { id: number; status: string; instruction: string; result: string | null; problems: string[]; error: string | null; created_at: string }[];
   revisions?: { id: number; comment: string | null; author: string; created_at: string }[];
 };
 
@@ -105,6 +107,7 @@ export function VacancyEditor({ id, onClose, onChanged }: { id: number; onClose:
             {Object.keys(v.published).map((p) => <span key={p} className="badge b-ok">✓ {p}</span>)}</div>
           {v.missing.length > 0 && <div className="error small">{t.l("E'lon uchun to'ldiring", "Для публикации заполните", "Fill in")}: {v.missing.map((m) => missName[m] || m).join(", ")}</div>}
           <pre className="ad-preview">{v.ad_text}</pre>
+          <AdStudio v={v} busy={busy} run={run} dirty={dirty} />
           <div className="card" style={{ padding: 12, boxShadow: "none" }}>
             <label className="field"><span><Ic n="spark" /> {t.l("Agentga izoh — u qayta yozadi", "Комментарий агенту — он перепишет", "Ask the agent to rewrite")}</span>
               <textarea rows={2} value={comment} onChange={(e) => setComment(e.target.value)}
@@ -146,5 +149,86 @@ export function VacancyEditor({ id, onClose, onChanged }: { id: number; onClose:
         </div>
       </div>
     </Modal>
+  );
+}
+
+/** 2 variants from the agent, a checked manual edit and "a task for the agent" — a person always applies the text. */
+function AdStudio({ v, busy, run, dirty }: { v: Vac; busy: string | null; run: (k: string, p: Promise<Vac>) => Promise<void>; dirty: boolean }) {
+  const t = useT();
+  const [text, setText] = useState<string | null>(null);
+  const [chk, setChk] = useState<any | null>(null);
+  const [task, setTask] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const JOB: Record<string, string> = { queued: t.l("navbatda", "в очереди", "queued"), running: t.l("ishlayapti", "в работе", "running"),
+    done: t.l("tayyor", "готово", "done"), failed: t.l("xato", "ошибка", "failed"), applied: t.l("qo'llandi", "применено", "applied") };
+  return (
+    <div className="card stack" style={{ padding: 12, boxShadow: "none" }}>
+      <div className="row"><b>{t.l("E'lon matni", "Текст объявления", "Ad text")}</b>
+        <span className="badge">{v.ad_custom ? t.l("tanlangan matn", "выбранный текст", "chosen text") : t.l("shablon", "шаблон", "template")}</span><span className="spacer" />
+        <button className="btn sm" disabled={!!busy || dirty || v.missing.length > 0} onClick={() => run("var", api<Vac>(`/api/vacancies/${v.id}/variants`, { method: "POST" }))}>
+          <Ic n="spark" />{busy === "var" ? t.l("Yozyapman…", "Пишу…", "Writing…") : t.l("2 ta variant", "2 варианта", "2 variants")}</button>
+        {v.ad_custom && <button className="btn sm" disabled={!!busy} onClick={() => run("tplad", api<Vac>(`/api/vacancies/${v.id}/ad/template`, { method: "POST" }))}>
+          {t.l("Shablonga qaytish", "Вернуть шаблон", "Back to template")}</button>}
+      </div>
+      {v.variants.map((a) => (
+        <div key={a.n} className="stack" style={{ gap: 4 }}>
+          <div className="row small"><b>{a.n}-variant</b><span className="muted">{a.source === "agent" ? t.l("agent", "агент", "agent") : t.l("shablon", "шаблон", "template")}</span>
+            <span className="spacer" />{a.chosen ? <span className="badge b-ok">✓</span> :
+              <button className="btn sm" disabled={!!busy} onClick={() => run("pick", api<Vac>(`/api/vacancies/${v.id}/variants/${a.n}/choose`, { method: "POST" }))}>{t.l("Tanlash", "Выбрать", "Choose")}</button>}</div>
+          <pre className="ad-preview" style={{ maxHeight: 160 }}>{a.text}</pre>
+        </div>
+      ))}
+      {text === null ? <button className="btn sm" onClick={() => { setText(v.ad_text || ""); setChk(null); }}>{t.l("Matnni qo'lda tahrirlash", "Править текст вручную", "Edit the text")}</button> : <>
+        <textarea rows={8} value={text} onChange={(e) => { setText(e.target.value); setChk(null); }} />
+        {chk && <div className={chk.ok ? "note small" : "error small"}>{chk.ok ? t.l("Tekshiruvdan o'tdi", "Проверка пройдена", "Passed the check") : chk.problems.join("; ")}
+          {chk.removed.length > 0 && <div>{t.l("Olib tashlanadi", "Будет удалено", "Will be cut")}: {chk.removed.join(", ")}</div>}</div>}
+        <div className="row">
+          <button className="btn sm" onClick={async () => { try { setChk(await api(`/api/vacancies/${v.id}/ad/check`, { body: { text } })); } catch (x: any) { setErr(x.message); } }}>
+            {t.l("Tekshirish", "Проверить", "Check")}</button>
+          <button className="btn sm primary" disabled={!!busy} onClick={() => run("ad", api<Vac>(`/api/vacancies/${v.id}/ad`, { method: "PATCH", body: { text } })).then(() => setText(null))}>{t("save")}</button>
+          <button className="btn sm" onClick={() => setText(null)}>{t("cancel")}</button></div>
+      </>}
+      <label className="field"><span><Ic n="spark" /> {t.l("Agentga topshiriq (natijani siz qo'llaysiz)", "Задача агенту (результат применяете вы)", "Task for the agent (you apply the result)")}</span>
+        <textarea rows={2} value={task} onChange={(e) => setTask(e.target.value)} placeholder={t.l("masalan: qisqaroq, ish vaqtini boshiga", "например: короче, график в начало", "e.g. shorter, schedule first")} /></label>
+      <button className="btn sm" disabled={task.trim().length < 3 || !!busy} onClick={() => run("job", api<Vac>(`/api/vacancies/${v.id}/jobs`, { body: { instruction: task } })).then(() => setTask(""))}>
+        {t.l("Navbatga qo'yish", "Поставить в очередь", "Queue")}</button>
+      {v.jobs.map((j) => (
+        <div key={j.id} className="stack small" style={{ gap: 4, borderTop: "1px solid var(--grid)", paddingTop: 6 }}>
+          <div className="row"><span className={`badge ${j.status === "done" ? "b-ok" : j.status === "failed" ? "b-bad" : ""}`}>{JOB[j.status] || j.status}</span>
+            <span>{j.instruction}</span><span className="spacer" />
+            {j.status === "done" && <button className="btn sm primary" disabled={!!busy} onClick={() => run("apply", api<Vac>(`/api/vacancies/jobs/${j.id}/apply`, { method: "POST" }))}>{t.l("Qo'llash", "Применить", "Apply")}</button>}</div>
+          {j.result && j.status === "done" && <pre className="ad-preview" style={{ maxHeight: 140 }}>{j.result}</pre>}
+          {j.problems.length > 0 && <div className="error">{j.problems.join("; ")}</div>}
+          {j.error && <div className="muted">{j.error}</div>}
+        </div>
+      ))}
+      <Err e={err} />
+    </div>
+  );
+}
+
+/** Admin-approved company facts: the only company facts the agent may put into an ad. */
+export function CompanyFacts() {
+  const t = useT();
+  const f = useLoad<any>("/api/company-facts");
+  const [text, setText] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  if (!f.data) return <Err e={f.error} />;
+  return (
+    <div className="card">
+      <div className="row" style={{ marginBottom: 8 }}><h2 style={{ margin: 0 }}>{t.l("Kompaniya faktlari", "Факты о компании", "Company facts")}</h2><span className="spacer" />
+        {f.data.can_edit && text === null && <button className="btn sm" onClick={() => setText(f.data.text || "")}>{t.l("Tahrirlash", "Изменить", "Edit")}</button>}</div>
+      <div className="muted small" style={{ marginBottom: 6 }}>{t.l("Agent e'lonlarda faqat shu faktlar va vakansiya kartasidagi ma'lumotlardan foydalanadi.",
+        "Агент пишет объявления только из этих фактов и карточки вакансии.", "The agent uses only these facts and the vacancy card in ads.")}</div>
+      {text === null ? <pre className="ad-preview" style={{ maxHeight: 180 }}>{f.data.text || "—"}</pre> : <>
+        <textarea rows={6} maxLength={4000} value={text} onChange={(e) => setText(e.target.value)} />
+        <div className="row" style={{ marginTop: 6 }}>
+          <button className="btn sm primary" onClick={async () => {
+            try { f.setData(await api("/api/company-facts", { method: "PATCH", body: { text } })); setText(null); } catch (x: any) { setErr(x.message); }
+          }}>{t("save")}</button>
+          <button className="btn sm" onClick={() => setText(null)}>{t("cancel")}</button></div>
+      </>}
+      <Err e={err} />
+    </div>
   );
 }

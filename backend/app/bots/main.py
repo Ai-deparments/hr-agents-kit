@@ -154,7 +154,8 @@ def agent_router(agent: str | None) -> Router:
                 last = await asyncio.to_thread(_last_draft, uid)
                 if last:
                     VDRAFT[uid] = last
-            if uid in VDRAFT and (VAC_PUBLISH.search(low) or VAC_CANCEL.search(low) or VAC_EDIT.search(low)):
+            if uid in VDRAFT and (VAC_PUBLISH.search(low) or VAC_CANCEL.search(low) or VAC_EDIT.search(low)
+                                  or VAC_VARIANTS.search(low) or await asyncio.to_thread(_has_variants_pick, VDRAFT[uid], text)):
                 return await vacancy_followup(m, uid, VDRAFT[uid], low, text)
             if VACANCY_INTENT.search(low):
                 return await vacancy_draft(m, text)
@@ -407,6 +408,7 @@ VAC_PUBLISH = re.compile(r"(e'?lon qil|chop et|joyla|tasdiqla|publish|опубл
 VAC_CANCEL = re.compile(r"^(bekor|o'chir|отмен|удали|не надо)")
 VAC_EDIT = re.compile(r"(maosh|oylik|talab|vazifa|ish vaqt|grafik|filial|matn|qisqa|uzun|qo'sh|olib tashla|o'zgartir|"
                       r"qayta yoz|зарплат|оклад|требован|обязанност|график|филиал|текст|короче|длинн|добав|убери|измени|перепиш)")
+VAC_VARIANTS = re.compile(r"(variant|вариант)")
 
 
 class _Intent:
@@ -424,18 +426,80 @@ def vacancy_link(vid: int) -> str:
     return f"{url}/jobs#{vid}" if url.startswith("https://") else ""
 
 
-def _vacancy_card(vid: int) -> str:
+def _vacancy_card(vid: int, show_variants: bool = False) -> str:
     from ..services import vacancies
     with SessionLocal() as db:
         v = db.get(Vacancy, vid)
         miss = vacancies.missing(v)
         ad = v.ad_text or ""
+        vs = [(a.n, a.text) for a in vacancies.variants(db, v)] if show_variants else []
     names = {"branch": L("filial", "филиал"), "salary_text": L("maosh", "зарплата"),
              "schedule_text": L("ish vaqti", "график"), "title": L("lavozim", "должность")}
     need = (L("\n\n⚠️ Yozing: ", "\n\n⚠️ Укажите: ") + ", ".join(names.get(x, x) for x in miss)) if miss else ""
-    hint = L("\n\n«e'lon qil» — chop etaman · o'zgartirish — nimani yozing · «bekor» — o'chiraman",
-             "\n\n«опубликуй» — выложу · правка — напишите что изменить · «отмена» — удалю")
+    if vs:
+        body = "\n".join(f"<b>{n}-variant</b>\n<blockquote expandable>{_esc(t)[:1500]}</blockquote>" for n, t in vs)
+        hint = L("\n\nQaysi biri? «1» yoki «2» deb yozing, yoki nimani o'zgartirishni yozing.",
+                 "\n\nКакой? Напишите «1» или «2», или что изменить.")
+        return f"📝 <b>#{vid}</b>\n{body}{need}{hint}"
+    hint = L("\n\n«e'lon qil» — chop etaman · «variantlar» — 2 ta variant · o'zgartirish — nimani yozing · «bekor» — o'chiraman",
+             "\n\n«опубликуй» — выложу · «варианты» — 2 варианта · правка — напишите что изменить · «отмена» — удалю")
     return f"📝 <b>#{vid}</b>\n<blockquote>{_esc(ad)[:3200]}</blockquote>{need}{hint}"
+
+
+def _has_variants_pick(vid: int, text: str) -> bool:
+    """A short reply like '2' / 'ikkinchisi' right after the variants were shown."""
+    from ..services import vacancies
+    if vacancies.pick_variant(text) is None:
+        return False
+    with SessionLocal() as db:
+        v = db.get(Vacancy, vid)
+        return bool(v and vacancies.variants(db, v))
+
+
+def _vacancy_variants(tg_id: int, vid: int) -> str | None:
+    from ..services import vacancies
+    with SessionLocal() as db:
+        v = db.get(Vacancy, vid)
+        if not v:
+            return L("Topilmadi", "Не найдено")
+        try:
+            vacancies.make_variants(db, _hr_scope(tg_id), v)
+        except ValueError as e:
+            return str(e)
+        db.commit()
+    return None
+
+
+def _vacancy_reply(tg_id: int, vid: int, text: str) -> tuple[str, str | None]:
+    """HR's words after the variants / on a chosen text: pick (code or the model's 1/2 label) or a checked rewrite.
+    Returns (kind, error): kind = picked | rewritten | fields."""
+    from ..services import vacancies
+    with SessionLocal() as db:
+        v = db.get(Vacancy, vid)
+        if not v:
+            return "fields", L("Topilmadi", "Не найдено")
+        scope = _hr_scope(tg_id)
+        has_variants = bool(vacancies.variants(db, v))
+        n = vacancies.pick_variant(text) if has_variants else None
+        if has_variants and n is None and not VAC_EDIT.search(text.lower()):
+            n = vacancies.pick_variant_ai(text)
+        try:
+            if n:
+                vacancies.choose(db, scope, v, n)
+                db.commit()
+                return "picked", None
+            if v.ad_custom:  # a chosen / edited text: the agent rewrites the text itself, the checker decides
+                res = vacancies.rewrite_text(db, v, text)
+                if res.get("error"):
+                    return "rewritten", res["error"]
+                if not res["ok"]:
+                    return "rewritten", "; ".join(res["problems"])
+                vacancies.set_ad(db, scope, v, res["text"], f"AI: {text[:200]}")
+                db.commit()
+                return "rewritten", None
+        except ValueError as e:
+            return "picked", str(e)
+    return "fields", _vacancy_rewrite(tg_id, vid, text)
 
 
 def _hr_scope(tg_id: int) -> Scope:
@@ -498,7 +562,11 @@ async def vacancy_draft(m: Message, brief: str) -> None:
 
 
 async def vacancy_followup(m: Message, uid: int, vid: int, low: str, text: str) -> None:
-    """HR answers the draft in words: publish / cancel / any change."""
+    """HR answers the draft in words: publish (only the exact confirm word) / cancel / variants / pick / any change."""
+    from ..services import vacancies
+    if VAC_PUBLISH.search(low) and not VAC_CANCEL.search(low) and not vacancies.is_confirm(text):
+        return await m.answer(L(f"Chop etish uchun aynan «{vacancies.confirm_words()[0]}» deb yozing.",
+                                f"Чтобы опубликовать, напишите ровно «{vacancies.confirm_words()[0]}»."))
     if VAC_PUBLISH.search(low) or VAC_CANCEL.search(low):
         act = "publish" if VAC_PUBLISH.search(low) else "cancel"
         ok, done = await asyncio.to_thread(_vacancy_finish, uid, vid, act)
@@ -514,7 +582,14 @@ async def vacancy_followup(m: Message, uid: int, vid: int, low: str, text: str) 
         await asyncio.to_thread(_remember, uid, text, out)
         return await m.answer(out)
     await m.bot.send_chat_action(m.chat.id, "typing")
-    err = await asyncio.to_thread(_vacancy_rewrite, uid, vid, text)
+    if VAC_VARIANTS.search(low) and vacancies.pick_variant(text) is None:  # "2 ta variant yoz", "варианты"
+        err = await asyncio.to_thread(_vacancy_variants, uid, vid)
+        if err:
+            return await m.answer(f"⚠️ {_esc(err)}")
+        card = await asyncio.to_thread(_vacancy_card, vid, True)
+        await asyncio.to_thread(_remember, uid, text, card)
+        return await m.answer(card)
+    _kind, err = await asyncio.to_thread(_vacancy_reply, uid, vid, text)
     if err:
         return await m.answer(f"⚠️ {_esc(err)}")
     card = await asyncio.to_thread(_vacancy_card, vid)
@@ -955,6 +1030,15 @@ def deliver_onboarding() -> None:
     log.info("onboarding course: %s item(s) queued", n)
 
 
+def run_agent_jobs() -> None:
+    """Panel 'task for the agent' (vacancy ad text): run queued jobs; a person applies the checked result."""
+    from ..services import vacancies
+    with SessionLocal() as db:
+        n = vacancies.run_jobs(db)
+    if n:
+        log.info("agent jobs: %s done", n)
+
+
 def purge_personal_data() -> None:
     with SessionLocal() as db:
         n = recruiting.purge_candidates(db)
@@ -995,6 +1079,7 @@ async def main() -> None:
     sched.add_job(send_talk_reminders, "cron", hour=8, minute=30, args=[sender])
     sched.add_job(deliver_onboarding, "cron", hour=9, minute=30)
     sched.add_job(interview_reminders, "interval", minutes=10)
+    sched.add_job(run_agent_jobs, "interval", minutes=1, max_instances=1)
     sched.start()
 
     async def run(name: str, bot: Bot):

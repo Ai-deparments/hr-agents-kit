@@ -23,6 +23,7 @@ class Ctx:
     agent: str
     depth: int = 0
     asked_agents: list[str] = field(default_factory=list)
+    user_text: str = ""  # the person's own message in this turn (empty for agent-to-agent questions)
 
 
 @dataclass
@@ -384,7 +385,7 @@ def _vac_draft(ctx: Ctx, title: str, branch_id: int | None = None, position_code
     audit(ctx.db, ctx.scope, "vacancy_draft", f"vacancy:{v.id}")
     miss = recruiting.missing_fields({"title": title, "branch": branch_id, "salary_text": salary_text, "schedule_text": schedule_text})
     return {"vacancy_id": v.id, "status": "draft", "missing": miss, "preview": recruiting.render_ad(v),
-            "note": "HR approves in the panel or with the ✅ button."}
+            "note": "HR approves in the panel or by writing the confirm word (e.g. e'lon qil)."}
 
 
 @tool("vacancy_write", "Write a vacancy post from HR's words (agent fills a fixed template; never invents salary, phones, "
@@ -397,10 +398,13 @@ def _vac_write(ctx: Ctx, brief: str):
             "next": "HR: say what to change, or 'e'lon qil' to publish"}
 
 
-@tool("vacancy_publish", "Publish a vacancy draft (bot list + public jobs page) — only when HR explicitly asked to publish.",
+@tool("vacancy_publish", "Publish a vacancy draft (bot list + public jobs page). Works only when HR's own message is "
+      "exactly the confirm word (e.g. \"e'lon qil\") — checked in code; otherwise ask HR to write it.",
       {"vacancy_id": I}, min_role="hr_head", required=["vacancy_id"])
 def _vac_publish(ctx: Ctx, vacancy_id: int):
     from ..services import vacancies
+    if not vacancies.is_confirm(ctx.user_text):
+        return {"error": "not published: HR must write exactly one of " + ", ".join(vacancies.confirm_words())}
     v = ctx.db.get(Vacancy, vacancy_id)
     if not v:
         return {"error": "not found"}

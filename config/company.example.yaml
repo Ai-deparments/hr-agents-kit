@@ -145,6 +145,9 @@ recruiting:
   shortlist_threshold: 70
   retention_days: 180         # personal-data retention: rejected / stale candidates are anonymised after this
   required_vacancy_fields: [title, branch, salary_text, schedule_text]
+  # In the bot a vacancy is published only when HR's whole message IS one of these words (optionally + vacancy number);
+  # "e'lon qilma" / "не опубликуй" never publish
+  publish_confirm_words: ["e'lon qil", "chop et", "опубликуй", "публикуй", "publish"]
 
 ads:
   budget_min: 10000

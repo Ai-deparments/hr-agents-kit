@@ -430,6 +430,7 @@ class Vacancy(Base):
     public: Mapped[bool] = mapped_column(Boolean, default=False)       # shown on the public /jobs page
     is_template: Mapped[bool] = mapped_column(Boolean, default=False)  # kept in the library for reuse
     published: Mapped[dict | None] = mapped_column(JSON)   # platform -> when / message id (never twice)
+    ad_custom: Mapped[bool] = mapped_column(Boolean, default=False)  # ad_text is a chosen variant / HR edit, not the template
     created_by: Mapped[str | None] = mapped_column(String(80))
     branch: Mapped[Branch | None] = relationship()
 
@@ -705,3 +706,34 @@ class DisciplineCase(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
     rule: Mapped[DisciplineRule] = relationship()
     employee: Mapped[Employee] = relationship()
+
+
+# ---------------- vacancy studio: ad variants and tasks for the agent ----------------
+
+class AdVariant(Base):
+    """One of the 2 ad texts the agent wrote for a vacancy (checked by services/ad_check.py)."""
+    __tablename__ = "ad_variants"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    vacancy_id: Mapped[int] = mapped_column(ForeignKey("vacancies.id"), index=True)
+    n: Mapped[int] = mapped_column(Integer)  # 1 | 2
+    text: Mapped[str] = mapped_column(Text)
+    source: Mapped[str] = mapped_column(String(10), default="template")  # agent | template
+    chosen: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+
+
+class AgentJob(Base):
+    """A task HR gives the agent from the panel. The bot worker runs it; a person applies the result."""
+    __tablename__ = "agent_jobs"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    kind: Mapped[str] = mapped_column(String(30))  # vacancy_ad
+    vacancy_id: Mapped[int | None] = mapped_column(ForeignKey("vacancies.id"), index=True)
+    instruction: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(10), default="queued")  # queued | running | done | failed | applied
+    result: Mapped[str | None] = mapped_column(Text)
+    problems: Mapped[list] = mapped_column(JSON, default=list)
+    error: Mapped[str | None] = mapped_column(String(300))
+    created_by: Mapped[str] = mapped_column(String(80))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime)
+    applied_by: Mapped[str | None] = mapped_column(String(80))

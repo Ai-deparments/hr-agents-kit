@@ -4,7 +4,7 @@ import { tEnum, useT } from "../i18n";
 import { Empty, Err, Light, Modal, Status, useLoad } from "../ui";
 import { can, usePanel } from "./ctx";
 import { CandidateHiring, SlotsCard } from "./Hiring";
-import { NewVacancy, VacancyEditor } from "./VacancyEditor";
+import { CompanyFacts, NewVacancy, VacancyEditor } from "./VacancyEditor";
 
 const CRIT: Record<string, string> = { role_fit: "crit_role_fit", specifics: "crit_specifics", communication: "crit_communication", motivation: "crit_motivation" };
 
@@ -73,6 +73,7 @@ export default function Recruiting() {
         {cands.data?.length === 0 && <Empty />}
       </div>
       <SlotsCard write={write} />
+      <CompanyFacts />
       {preview && <Modal title={`${t("rc_ad")} · ${preview.title}`} onClose={() => setPreview(null)}>
         <pre style={{ whiteSpace: "pre-wrap", fontFamily: "var(--font)", background: "var(--surface-2)", padding: 12, borderRadius: 10, margin: 0 }}>{preview.ad_text}</pre>
       </Modal>}

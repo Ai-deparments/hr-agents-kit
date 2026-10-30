@@ -69,7 +69,9 @@ def run_agent(db: Session, agent: str, scope: Scope, text: str, user_key: str, d
     if not scope.at_least(a.min_role):
         audit(db, scope, "agent_refused", agent)
         return refusal(agent)
-    ctx = Ctx(db=db, scope=scope, agent=agent, depth=depth)
+    # the person's own words (without a quoted earlier message): code-level checks such as the publish confirm word use them
+    own = text.split("[/Reply]", 1)[-1].strip() if "[/Reply]" in text else text.strip()
+    ctx = Ctx(db=db, scope=scope, agent=agent, depth=depth, user_text=own if not depth else "")
     tools = tools_for(a.tools, scope)
     if not depth:
         audit(db, scope, "agent_message", agent, text=text[:500])

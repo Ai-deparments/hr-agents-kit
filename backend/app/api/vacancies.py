@@ -10,12 +10,13 @@ from sqlalchemy.orm import Session
 from ..auth import require
 from ..config import cfg
 from ..db import get_db
-from ..models import Vacancy, VacancyRevision
+from ..models import AgentJob, Vacancy, VacancyRevision
 from ..rbac import Scope
 from ..services import recruiting, vacancies
 
 router = APIRouter(prefix="/api/vacancies")
 public = APIRouter(prefix="/api/public")
+facts_router = APIRouter(prefix="/api/company-facts")
 
 
 def _get(db: Session, scope: Scope, vid: int) -> Vacancy:
@@ -30,7 +31,11 @@ def _row(db: Session, v: Vacancy, revisions: bool = False) -> dict:
            "status": v.status, "salary_text": v.salary_text, "schedule_text": v.schedule_text, "intro": v.intro,
            "duties": v.duties, "requirements": v.requirements, "benefits": v.benefits, "ad_text": v.ad_text,
            "public": v.public, "is_template": v.is_template, "published": v.published or {}, "missing": vacancies.missing(v),
-           "apply_url": recruiting.apply_url(v), "channel_configured": bool(cfg("recruiting.jobs_channel"))}
+           "apply_url": recruiting.apply_url(v), "channel_configured": bool(cfg("recruiting.jobs_channel")),
+           "ad_custom": bool(v.ad_custom),
+           "variants": [{"n": a.n, "text": a.text, "source": a.source, "chosen": a.chosen} for a in vacancies.variants(db, v)],
+           "jobs": [vacancies.job_dict(j) for j in db.scalars(select(AgentJob).where(AgentJob.vacancy_id == v.id)
+                                                              .order_by(AgentJob.id.desc()).limit(10))]}
     if revisions:
         out["revisions"] = [{"id": r.id, "comment": r.comment, "author": r.author, "created_at": r.created_at}
                             for r in db.scalars(select(VacancyRevision).where(VacancyRevision.vacancy_id == v.id)
@@ -41,6 +46,8 @@ def _row(db: Session, v: Vacancy, revisions: bool = False) -> dict:
 def _guard(fn, *a, **kw):
     try:
         return fn(*a, **kw)
+    except PermissionError as e:
+        raise HTTPException(403, str(e))
     except ValueError as e:
         raise HTTPException(400, str(e))
 
@@ -149,6 +156,92 @@ def template(vid: int, body: TemplateIn, scope: Scope = Depends(require("recruit
     v.is_template = body.is_template
     db.commit()
     return _row(db, v)
+
+
+# ---------------- studio: 2 variants, checked ad text, tasks for the agent ----------------
+
+@router.post("/{vid}/variants")
+def make_variants(vid: int, scope: Scope = Depends(require("recruiting")), db: Session = Depends(get_db)):
+    v = _get(db, scope, vid)
+    _guard(vacancies.make_variants, db, scope, v)
+    db.commit()
+    return _row(db, v, True)
+
+
+@router.post("/{vid}/variants/{n}/choose")
+def choose_variant(vid: int, n: int, scope: Scope = Depends(require("recruiting")), db: Session = Depends(get_db)):
+    v = _get(db, scope, vid)
+    _guard(vacancies.choose, db, scope, v, n)
+    db.commit()
+    return _row(db, v, True)
+
+
+class AdIn(BaseModel):
+    text: str = Field(min_length=10, max_length=4000)
+
+
+@router.post("/{vid}/ad/check")
+def ad_check(vid: int, body: AdIn, scope: Scope = Depends(require("recruiting")), db: Session = Depends(get_db)):
+    """Dry run: what the checker would cut / reject. Nothing is saved."""
+    v = _get(db, scope, vid)
+    return vacancies.check(db, v, vacancies.finish_ad(v, body.text))
+
+
+@router.patch("/{vid}/ad")
+def ad_set(vid: int, body: AdIn, scope: Scope = Depends(require("recruiting")), db: Session = Depends(get_db)):
+    v = _get(db, scope, vid)
+    _guard(vacancies.set_ad, db, scope, v, body.text, "HR edit of the ad text")
+    db.commit()
+    return _row(db, v, True)
+
+
+@router.post("/{vid}/ad/template")
+def ad_template(vid: int, scope: Scope = Depends(require("recruiting")), db: Session = Depends(get_db)):
+    v = _get(db, scope, vid)
+    vacancies.use_template(db, scope, v)
+    db.commit()
+    return _row(db, v, True)
+
+
+class JobIn(BaseModel):
+    instruction: str = Field(min_length=3, max_length=1000)
+
+
+@router.post("/{vid}/jobs")
+def job_add(vid: int, body: JobIn, scope: Scope = Depends(require("recruiting")), db: Session = Depends(get_db)):
+    v = _get(db, scope, vid)
+    _guard(vacancies.queue_job, db, scope, v, body.instruction)
+    db.commit()
+    return _row(db, v, True)
+
+
+@router.post("/jobs/{jid}/apply")
+def job_apply(jid: int, scope: Scope = Depends(require("recruiting")), db: Session = Depends(get_db)):
+    j = db.get(AgentJob, jid)
+    if not j or not j.vacancy_id:
+        raise HTTPException(404, "Not found")
+    v = _get(db, scope, j.vacancy_id)
+    _guard(vacancies.apply_job, db, scope, j)
+    db.commit()
+    return _row(db, v, True)
+
+
+# ---------------- company facts: the only company facts the agent may use (admins edit) ----------------
+
+@facts_router.get("")
+def facts_get(scope: Scope = Depends(require("recruiting.read")), db: Session = Depends(get_db)):
+    return {**vacancies.facts(db), "can_edit": "*" in scope.perms}
+
+
+class FactsIn(BaseModel):
+    text: str = Field(max_length=4000)
+
+
+@facts_router.patch("")
+def facts_put(body: FactsIn, scope: Scope = Depends(require("recruiting.read")), db: Session = Depends(get_db)):
+    out = _guard(vacancies.set_facts, db, scope, body.text)
+    db.commit()
+    return {**out, "can_edit": True}
 
 
 # ---------------- public jobs feed (no login): only open + public vacancies, no internal fields ----------------
