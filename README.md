@@ -88,6 +88,13 @@ Hammasi filial bo'yicha ruxsat bilan cheklangan.
 
 v0.3 dan yangilash va yangi `CAMERA_WEBHOOK_SECRET` (faqat AI kamera bo'lsa): [docs/IMPROVEMENTS.md](docs/IMPROVEMENTS.md#v031-2026-10-30).
 
+### v0.3.3 da yangi (60 savollik jonli test natijasi)
+
+- **Baza bloklanmaydi:** bir vaqtda bir nechta mavzuda yozilsa ham javob yo'qolmaydi (SQLite WAL + kutish).
+- **Agentga yangi vositalar:** hh.uz qidiruvi, suhbat vaqtlarini ko'rish va qo'shish, ish taklifini yuborish, yangi xodimlar ro'yxati, bo'limlar bo'yicha davomat, bugungi onboarding suhbatlari.
+- **Kechikish to'g'ri hisoblanadi:** hali smenada bo'lgan kechikkanlar ham sanaladi.
+- **«Qanday qilaman?» savollari:** agent panelning aniq bo'limini ko'rsatadi; javoblarda inglizcha so'zlar yo'q.
+
 ### v0.3.2 da yangi
 
 - **Xodim so'rovlari so'z bilan.** Xodim botga «ma'lumotnoma kerak» yoki «ta'til 5–10 noyabr» deb yozadi → HR guruh mavzusiga xabar keladi → HR shu xabarga «tasdiqlayman» yoki «rad: sabab» deb javob beradi → xodimga javob va ma'lumotnoma PDF yuboriladi; ta'til buyrug'i imzo uchun «hujjatlar» mavzusiga tushadi. Paneldagi qaror ham xuddi shunday xabar beradi.
@@ -216,6 +223,13 @@ Stek va kod qoidalari: [`.claude/skills/default-stack`](.claude/skills/default-s
 - **Отчёты.** Зарплата: с 1-го числа каждый день, пока табель прошлого месяца не закрыт (без сумм). Аналитика: недельные сигналы по филиалам (последние 7 дней ≥ 3 и ≥ 2× среднего за 4 недели) — в группу только число, по филиалам — в личку.
 
 Обновление с v0.3 и новая переменная `CAMERA_WEBHOOK_SECRET` (только если есть AI-камера): [docs/IMPROVEMENTS.md](docs/IMPROVEMENTS.md#v031-2026-10-30).
+
+### Новое в v0.3.3 (по итогам живого теста на 60 вопросов)
+
+- **База не блокируется:** ответы не теряются, когда пишут в нескольких темах одновременно (SQLite WAL + ожидание).
+- **Новые инструменты агента:** поиск hh.uz, просмотр и добавление слотов собеседований, отправка оффера, новые сотрудники, посещаемость по отделам, беседы онбординга на сегодня.
+- **Опоздания считаются верно:** включая тех, кто ещё на смене.
+- **Вопросы «как сделать»:** агент называет точный раздел панели; без английских слов в ответах.
 
 ### Новое в v0.3.2
 

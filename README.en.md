@@ -71,6 +71,13 @@ Everything is limited by branch scope.
 
 Upgrade from v0.3: see [docs/IMPROVEMENTS.md](docs/IMPROVEMENTS.md#v031-2026-10-30).
 
+### New in v0.3.3 (from a 60-question live test)
+
+- **No more "database is locked":** answers are not lost when several topics are busy at once (SQLite WAL + busy timeout).
+- **New agent tools:** hh.uz search, interview slots (view and add), job offer, new hires, attendance by department, today's onboarding talks.
+- **Lateness counted correctly**, including people still on shift.
+- **How-to questions** get the exact panel section; no English words inside Uzbek/Russian answers.
+
 ### New in v0.3.2
 
 - **Employee requests in words:** the employee asks the bot (certificate, vacation…), HR gets a notice in the group topic and replies "tasdiqlayman" or "rad: reason"; the employee gets the answer and the certificate PDF, the leave order goes to the documents topic for signature. Panel decisions notify the same way.

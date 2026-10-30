@@ -16,11 +16,17 @@ def make_engine(url: str | None = None):
     url = url or settings().database_url
     if url.startswith("sqlite:///"):
         Path(url.removeprefix("sqlite:///")).parent.mkdir(parents=True, exist_ok=True)
-    eng = create_engine(url, connect_args={"check_same_thread": False} if url.startswith("sqlite") else {})
+    eng = create_engine(url, connect_args={"check_same_thread": False, "timeout": 15} if url.startswith("sqlite") else {})
     if url.startswith("sqlite"):
         @event.listens_for(eng, "connect")
         def _fk(dbapi_conn, _):
             dbapi_conn.execute("PRAGMA foreign_keys=ON")
+            # bot, API and importers write at the same time: WAL lets readers and one writer work together,
+            # busy_timeout makes a writer wait for the lock instead of failing with "database is locked"
+            dbapi_conn.execute("PRAGMA busy_timeout=15000")
+            if ":memory:" not in url:
+                dbapi_conn.execute("PRAGMA journal_mode=WAL")
+                dbapi_conn.execute("PRAGMA synchronous=NORMAL")
     return eng
 
 

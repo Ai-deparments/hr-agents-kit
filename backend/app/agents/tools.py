@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any, Callable
 
 from sqlalchemy import select
@@ -76,7 +76,10 @@ def _overview(ctx: Ctx):
       {"date": {**S, "description": "YYYY-MM-DD, default today"}, "branch_id": I})
 def _att_day(ctx: Ctx, date: str | None = None, branch_id: int | None = None):
     s = attendance.day_summary(ctx.db, ctx.scope, _d(date) or datetime.now().date(), branch_id)
+    s["on_time"] = [r["full_name"] for r in s["rows"] if r["status"] == "present"]
     s["rows"] = [r for r in s["rows"] if r["status"] not in ("present", "off", "not_employed")][:30]
+    s["note"] = ("Totals (came, late, unmarked) are authoritative. 'rows' lists only people who need attention (late, on "
+                 "shift, unmarked…); people who came on time are in 'on_time'. Late = came after start, incl. still on shift.")
     return s
 
 
@@ -534,3 +537,115 @@ def _sales_ranking(ctx: Ctx, month: str | None = None, branch_id: int | None = N
     lim = max(1, min(limit, 60))
     r["rows"] = r["rows"][:lim] if r["n"] <= lim else r["rows"][:lim - 5] + r["rows"][-5:]  # always keep the bottom 5
     return r
+
+
+# ---------------- added after the group test: tools the HR agent was missing ----------------
+
+@tool("hh_search", "Search résumés on hh.uz (read-only; contacts are opened by a person on hh.uz, never bought here). "
+      "Returns up to 10: title, age, salary, experience, area, url.", {"text": S, "experience": S}, min_role="hr_head",
+      required=["text"])
+def _hh_search(ctx: Ctx, text: str, experience: str = ""):
+    from ..services import hh
+    try:
+        r = hh.search(text, experience=experience)
+    except hh.HhError as e:
+        return {"error": str(e), "status": hh.status()}
+    items = r.get("items", r) if isinstance(r, dict) else r
+    return {"mode": hh.status().get("mode"), "found": r.get("found") if isinstance(r, dict) else None,
+            "items": (items or [])[:10]}
+
+
+@tool("interview_slots", "Interview time slots from today: free and booked (with the candidate).", min_role="hr_head")
+def _slots(ctx: Ctx):
+    from ..models import InterviewSlot
+    rows = ctx.db.scalars(select(InterviewSlot).where(InterviewSlot.starts_at >= datetime.now().replace(hour=0, minute=0),
+                                                      InterviewSlot.status.in_(("free", "booked"))).order_by(InterviewSlot.starts_at))
+    return [{"id": s.id, "at": s.starts_at.strftime("%d.%m %H:%M"), "minutes": s.minutes, "place": s.place,
+             "interviewer": s.interviewer, "status": s.status,
+             "candidate": ctx.db.get(Candidate, s.candidate_id).full_name if s.candidate_id else None} for s in rows]
+
+
+@tool("interview_slots_add", "Add free interview times for one day (HR's words: day + times). Candidates then pick one by number.",
+      {"day": {**S, "description": "YYYY-MM-DD"}, "times": {"type": "array", "items": S, "description": "['10:00','10:30']"},
+       "place": S, "interviewer": S, "minutes": I}, min_role="hr_head", required=["day", "times"])
+def _slots_add(ctx: Ctx, day: str, times: list, place: str = "", interviewer: str = "", minutes: int = 30):
+    from ..models import InterviewSlot
+    d, made = _d(day), []
+    if not d:
+        return {"error": "day must be YYYY-MM-DD"}
+    for t in times[:20]:
+        try:
+            hh_, mm = map(int, str(t).strip().split(":"))
+            at = datetime.combine(d, datetime.min.time()).replace(hour=hh_, minute=mm)
+        except ValueError:
+            return {"error": f"bad time {t}"}
+        if at <= datetime.now():
+            return {"error": f"time in the past: {t}"}
+        s = InterviewSlot(starts_at=at, minutes=max(10, min(minutes or 30, 240)), place=place[:300],
+                          interviewer=interviewer[:160], created_by=ctx.scope.actor)
+        ctx.db.add(s)
+        made.append(at.strftime("%d.%m %H:%M"))
+    audit(ctx.db, ctx.scope, "slots_add", None, count=len(made), day=day)
+    ctx.db.commit()
+    return {"added": made}
+
+
+@tool("job_offer", "Send a job offer to a candidate in Telegram — ONLY when HR explicitly asked and gave salary and start date. "
+      "The candidate answers 'qabul qilaman' in words; then the employee card (probation) and onboarding are created.",
+      {"candidate_id": I, "salary_text": S, "start_date": {**S, "description": "YYYY-MM-DD"}, "position_id": I, "note": S},
+      min_role="hr_head", required=["candidate_id", "salary_text", "start_date"])
+def _job_offer(ctx: Ctx, candidate_id: int, salary_text: str, start_date: str, position_id: int | None = None, note: str = ""):
+    from ..services import hiring
+    c, start = ctx.db.get(Candidate, candidate_id), _d(start_date)
+    if not c or not start:
+        return {"error": "candidate not found or bad start_date"}
+    try:
+        out = hiring.offer(ctx.db, ctx.scope, c, position_id, salary_text[:200], start, None, note[:500])
+    except ValueError as e:
+        return {"error": str(e)}
+    ctx.db.commit()
+    return {"sent": True, "text": out["text"]}
+
+
+@tool("new_hires", "Employees hired in the last N days (by hire date) and everyone on probation.", {"days": I})
+def _new_hires(ctx: Ctx, days: int = 30):
+    since = date.today() - timedelta(days=max(1, min(days or 30, 365)))
+    rows = [e for e in ctx.db.scalars(select(Employee).where(Employee.status != "fired"))
+            if (not e.branch_id or ctx.scope.allows_branch(e.branch_id)) and ((e.hire_date and e.hire_date >= since) or e.status == "probation")]
+    return {"since": since.isoformat(), "no_hire_date": sum(1 for e in rows if not e.hire_date),
+            "employees": [{"id": e.id, "full_name": e.full_name, "position": e.position.title if e.position else None,
+                           "hire_date": e.hire_date.isoformat() if e.hire_date else None, "status": e.status} for e in rows]}
+
+
+@tool("attendance_by_department", "Attendance rate per department for the last N days (1..31): scheduled, came, late, %.",
+      {"days": I})
+def _att_dept(ctx: Ctx, days: int = 7):
+    from collections import defaultdict
+    from ..services import reports
+    tot = defaultdict(lambda: {"sched": 0, "came": 0, "late": 0})
+    for i in range(max(1, min(days or 7, 31))):
+        s = attendance.day_summary(ctx.db, ctx.scope, date.today() - timedelta(days=i))
+        for k, v in reports._groups(ctx.db, s).items():
+            for f in ("sched", "came", "late"):
+                tot[k][f] += v[f]
+    return sorted(({"department": k, **v, "rate": round(100 * v["came"] / v["sched"]) if v["sched"] else None}
+                   for k, v in tot.items()), key=lambda x: x["rate"] if x["rate"] is not None else 101)
+
+
+@tool("onboarding_today", "Onboarding TODAY: talks scheduled with new employees (not candidate interviews), materials not "
+      "viewed for 2+ days, people on probation.")
+def _onb_today(ctx: Ctx):
+    from ..models import MaterialSend, OnboardingMaterial
+    a = datetime.combine(date.today(), datetime.min.time())
+    title = {m.id: m.title for m in ctx.db.scalars(select(OnboardingMaterial))}
+    talks = ctx.db.scalars(select(MaterialSend).where(MaterialSend.talk_done.is_(False), MaterialSend.talk_at >= a,
+                                                      MaterialSend.talk_at < a + timedelta(days=1)).order_by(MaterialSend.talk_at))
+    unseen = ctx.db.scalars(select(MaterialSend).where(MaterialSend.queued.is_(True), MaterialSend.viewed_at.is_(None),
+                                                       MaterialSend.sent_at < a - timedelta(days=2)))
+    probation = ctx.db.scalars(select(Employee).where(Employee.status == "probation"))
+    return {"talks_today": [{"at": t.talk_at.strftime("%H:%M"), "employee": t.employee.full_name, "with": t.talk_with,
+                             "material": title.get(t.material_id)} for t in talks],
+            "not_viewed_2d": [{"employee": s.employee.full_name, "material": title.get(s.material_id),
+                               "sent": s.sent_at.strftime("%d.%m")} for s in unseen],
+            "on_probation": [e.full_name for e in probation if not e.branch_id or ctx.scope.allows_branch(e.branch_id)],
+            "library_size": len(title)}

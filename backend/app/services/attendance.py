@@ -39,7 +39,7 @@ def came(status: str, check_in: str | None = None) -> bool:
 
 
 def was_late(status: str, late_min: int | None) -> bool:
-    return status == "late" or (status == "needs_review" and bool(late_min))
+    return status == "late" or (status in ("needs_review", "on_shift") and bool(late_min))
 
 
 @dataclass
