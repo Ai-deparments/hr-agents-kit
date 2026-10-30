@@ -46,6 +46,9 @@ def week_data(db: Session, scope: Scope, monday: date) -> dict:
         "monday": monday, "end": end, "days": days,
         "people": sorted(({"id": k[0], "name": k[1], **v} for k, v in per_emp.items()), key=lambda x: (-x["late"], -x["late_min"])),
         "headcount": cnt(select(func.count(Employee.id)).where(Employee.status != "fired")),
+        # attendance % covers only people the time system tracks; sales agents (Smartup) are counted apart
+        "tracked": len(per_emp),
+        "sales_agents": _sales_agents(db),
         "hired": cnt(select(func.count(Employee.id)).where(Employee.hire_date.between(monday, end))),
         "fired": cnt(select(func.count(Employee.id)).where(Employee.fire_date.between(monday, end))),
         "vacancies_open": cnt(select(func.count(Vacancy.id)).where(Vacancy.status == "open")),
@@ -60,6 +63,19 @@ def week_data(db: Session, scope: Scope, monday: date) -> dict:
     }
 
 
+def _sales_agents(db: Session) -> int:
+    from ..models import Department
+    d = db.scalar(select(Department).where(Department.name == cfg("imports.smartup.department", "Savdo agentlari")))
+    return db.scalar(select(func.count(Employee.id)).where(Employee.department_id == d.id, Employee.status != "fired")) if d else 0
+
+
+def _staff_line(w: dict) -> str:
+    parts = [f"davomat hisobida {w.get('tracked', 0)}"]
+    if w.get("sales_agents"):
+        parts.append(f"savdo agentlari {w['sales_agents']}")
+    return f"{w['headcount']} ({' · '.join(parts)})"
+
+
 def _pct(a: int, b: int) -> str:
     return f"{round(100 * a / b)}%" if b else "—"
 
@@ -69,7 +85,8 @@ def week_md(w: dict) -> str:
     sched, came = sum(x["sched"] for x in w["days"]), sum(x["came"] for x in w["days"])
     late, unm = sum(x["late"] for x in w["days"]), sum(x["unmarked"] for x in w["days"])
     out = [f"## {E('chart_up')} Haftalik hisobot — {w['monday']:%d.%m}–{w['end']:%d.%m}",
-           f"- Davomat: **{_pct(came, sched)}**\n- Kechikish: **{late}**\n- Belgilanmagan kun: **{unm}**\n"
+           f"- Xodimlar: **{_staff_line(w)}**\n"
+           f"- Davomat: **{_pct(came, sched)}** (faqat davomat hisobidagilar)\n- Kechikish: **{late}**\n- Belgilanmagan kun: **{unm}**\n"
            f"- Ishga kirdi / ketdi: **{w['hired']}** / **{w['fired']}**",
            f"### {E('calendar')} Kunlar", "\n".join(
                f"- {DAYS[x['date'].weekday()]} {x['date']:%d.%m} — {x['came']}/{x['sched']}" + (f", kechikdi {x['late']}" if x["late"] else "")
@@ -88,7 +105,7 @@ def week_text(w: dict) -> str:
     sched, came = sum(x["sched"] for x in w["days"]), sum(x["came"] for x in w["days"])
     late = sum(x["late"] for x in w["days"])
     return (f"<b>Haftalik HR hisobot — {w['monday']:%d.%m}–{w['end']:%d.%m.%Y}</b>\n"
-            f"Xodimlar: <b>{w['headcount']}</b> · davomat: <b>{_pct(came, sched)}</b> · kechikish: <b>{late}</b>\n"
+            f"Xodimlar: <b>{_staff_line(w)}</b> · davomat: <b>{_pct(came, sched)}</b> · kechikish: <b>{late}</b>\n"
             f"Ishga kirdi: {w['hired']} · ketdi: {w['fired']} · nomzod: {w['candidates_new']} · suhbat: {w['interviews']}\n"
             "Batafsil — Excel faylda.")
 
@@ -124,7 +141,8 @@ def week_excel(w: dict) -> bytes:
     X.sheet(dash, {"A": 2, **{c: 14 for c in "BCDEFGHIJKLM"}})
     X.title(dash, f"Haftalik HR hisobot — {cfg('company.name', '')}", f"Davr: {period}", 13)
     rng = (f"ANALYTICS!$C${a1}:$C${a2}", f"ANALYTICS!$D${a1}:$D${a2}", f"ANALYTICS!$E${a1}:$E${a2}")
-    X.kpi(dash, 4, 2, "Xodimlar", f"={w['headcount']}", note="faol, hafta oxirida")
+    X.kpi(dash, 4, 2, "Xodimlar", f"={w['headcount']}",
+          note=f"davomatda {w.get('tracked', 0)}" + (f", savdo agenti {w['sales_agents']}" if w.get("sales_agents") else ""))
     X.kpi(dash, 4, 4, "Davomat", f"=IFERROR(SUM({rng[1]})/SUM({rng[0]}),0)" if days else "=0", "0%", note="keldi / rejada")
     X.kpi(dash, 4, 6, "Kechikishlar", f"=SUM({rng[2]})" if days else "=0", note="hafta bo'yi", accent=X.RED)
     X.kpi(dash, 4, 8, "Ishga kirdi", f"={w['hired']}", note="hire date shu hafta")

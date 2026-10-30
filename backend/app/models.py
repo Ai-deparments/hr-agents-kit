@@ -72,6 +72,7 @@ class Employee(Base):
     branch_id: Mapped[int | None] = mapped_column(ForeignKey("branches.id"), index=True)
     department_id: Mapped[int | None] = mapped_column(ForeignKey("departments.id"), index=True)
     bot_functions: Mapped[list] = mapped_column(JSON, default=list)  # sub-agent functions HR opened in the bot
+    lang: Mapped[str | None] = mapped_column(String(2))  # uz | ru — the language the person writes to the bot in
     position_id: Mapped[int | None] = mapped_column(ForeignKey("positions.id"))
     hire_date: Mapped[date | None] = mapped_column(Date)
     fire_date: Mapped[date | None] = mapped_column(Date)

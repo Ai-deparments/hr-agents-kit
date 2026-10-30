@@ -20,6 +20,8 @@ log = logging.getLogger("requests_flow")
 
 KIND_UZ = {"vacation": "ta'til", "certificate": "ma'lumotnoma", "shift_swap": "smena almashish",
            "sick_leave": "kasallik varaqasi", "other": "boshqa so'rov"}
+KIND_RU = {"vacation": "отпуск", "certificate": "справка", "shift_swap": "обмен сменами",
+           "sick_leave": "больничный", "other": "заявка"}
 NOTICE_RE = re.compile(r"So'rov #(\d{1,9})")
 # "so'rov 12 ...", "заявка №12 ...", "#12 ..." at the start of the message
 CMD_RE = re.compile(r"^\s*(?:(?:so['ʻ’`]?rov|заявк[аиу]?)\s*[#№]?\s*|#)(\d{1,9})\b", re.I)
@@ -114,10 +116,15 @@ def apply_decision(db: Session, scope: Scope, rid: int, approve: bool, reason: s
     r = people.decide_request(db, scope, rid, approve, reason)  # writes the audit entry
     emp, kind = r.employee, KIND_UZ.get(r.kind, r.kind)
     res = {"id": r.id, "status": r.status, "employee": emp.full_name, "sent": False, "doc": None, "order": None}
-    if approve:
-        text = f"✅ So'rovingiz #{r.id} ({kind}{_period(r)}) tasdiqlandi."
+    per = _period(r)
+    if emp.lang == "ru":  # the employee's own language (remembered from their messages to the bot)
+        per = per.replace(" kun)", " дн.)")
+        text = (f"✅ Ваша заявка #{r.id} ({KIND_RU.get(r.kind, r.kind)}{per}) одобрена." if approve else
+                f"❌ Ваша заявка #{r.id} ({KIND_RU.get(r.kind, r.kind)}{per}) отклонена. Причина: {reason}")
+    elif approve:
+        text = f"✅ So'rovingiz #{r.id} ({kind}{per}) tasdiqlandi."
     else:
-        text = f"❌ So'rovingiz #{r.id} ({kind}{_period(r)}) rad etildi. Sabab: {reason}"
+        text = f"❌ So'rovingiz #{r.id} ({kind}{per}) rad etildi. Sabab: {reason}"
     file = None
     if approve and r.kind == "certificate":
         try:

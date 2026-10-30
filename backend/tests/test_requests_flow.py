@@ -110,3 +110,19 @@ def test_decision_must_start_the_message():
     assert parse("bilmayman, ok keyin qarayman", n) is None          # "ok" inside a sentence is not an approval
     assert parse("hali emas, ertaga tasdiqlayman", n) is None
     assert parse("ha lekin keyin", n) is None
+
+
+def test_answer_in_employee_language(db, emp):
+    emp.lang = "ru"
+    db.commit()
+    r = _req(db, emp, "shift_swap", comment="")
+    requests_flow.handle(db, scope_for_telegram(db, HR_TG), f"#{r.id} rad: нет замены")
+    o = db.scalar(select(Outbox).where(Outbox.telegram_id == EMP_TG).order_by(Outbox.id.desc()))
+    assert "отклонена" in o.text and "нет замены" in o.text
+
+
+def test_bot_remembers_language_on_card(db, emp):
+    from app.bots import main as bot
+    bot._save_lang(EMP_TG, "ru")
+    db.refresh(emp)
+    assert emp.lang == "ru"

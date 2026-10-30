@@ -299,10 +299,26 @@ async def topic_middleware(handler, event, data):
     return await handler(event, data)
 
 
+_LANG_SAVED: dict[int, str] = {}
+
+
+def _save_lang(tg_id: int, lang: str) -> None:
+    """Remember the language on the employee card, so messages sent later (request answers, PDFs) use it too."""
+    with SessionLocal() as db:
+        e = db.scalar(select(Employee).where(Employee.telegram_id == tg_id))
+        if e and e.lang != lang:
+            e.lang = lang
+            db.commit()
+
+
 async def lang_middleware(handler, event, data):
     u = data.get("event_from_user")
     msg = getattr(event, "message", None)
-    LANG.set(detect_lang(u.id, (msg.text or msg.caption or "") if msg else "", u.language_code) if u else "uz")
+    lang = detect_lang(u.id, (msg.text or msg.caption or "") if msg else "", u.language_code) if u else "uz"
+    LANG.set(lang)
+    if u and msg and msg.chat.type == "private" and _LANG_SAVED.get(u.id) != lang:
+        _LANG_SAVED[u.id] = lang
+        await asyncio.to_thread(_save_lang, u.id, lang)
     return await handler(event, data)
 
 
