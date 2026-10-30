@@ -27,6 +27,24 @@ def _code(s: str) -> str:
     return c
 
 
+# ---------------- bot: who sees what in the HR group and in private chat ----------------
+
+@router.get("/bot-visibility")
+def bot_visibility(scope: Scope = Depends(ADMIN), db: Session = Depends(get_db)):
+    from ..services import visibility
+    return {"categories": visibility.CATEGORIES, "channels": list(visibility.CHANNELS), "roles": list(visibility.ROLES),
+            "people": visibility.people_with_bot_access(db), "settings": visibility.get(db)}
+
+
+@router.put("/bot-visibility")
+def bot_visibility_save(body: dict, scope: Scope = Depends(ADMIN), db: Session = Depends(get_db)):
+    from ..services import visibility
+    v = visibility.save(db, body)
+    audit(db, scope, "bot_visibility", None, roles=v["roles"], people=sorted(v["people"]))
+    db.commit()
+    return v
+
+
 # ---------------- permission catalog ----------------
 
 @router.get("/org/catalog")

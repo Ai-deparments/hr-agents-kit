@@ -454,6 +454,10 @@ def tools_for(names: list[str], scope: Scope) -> list[Tool]:
             continue
         if t.needs_payroll and not scope.payroll:
             continue
+        if scope.hidden:
+            from ..services.visibility import TOOL_CATEGORY
+            if TOOL_CATEGORY.get(n) in scope.hidden:
+                continue
         out.append(t)
     return out
 

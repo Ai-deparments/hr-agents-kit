@@ -136,8 +136,13 @@ def payroll_md(db: Session, scope: Scope, today: date | None = None, evening: bo
     names = {"penalty": "Jarima", "bonus": "Bonus", "advance": "Avans", "other": "Ushlanma / boshqa"}
     head = f"Oylik — bugungi yozuvlar, {today:%d.%m}" if evening else f"Oylik — {month}, {today:%d.%m} holatiga"
     out = [f"## {E('money')} {head}", _li([f"{names[k]}: **{_som(tot[k])}**" for k in names if tot.get(k)] or ["Yozuvlar yo'q"])]
-    if per_pen:  # the group sees only totals; who got how much — privately to people with payroll rights
-        out += [f"- Jarima olganlar: **{len(per_pen)}** kishi (ismlar va summalar — shaxsiy chatda, agentdan so'rang)"]
+    from . import visibility
+    if per_pen and visibility.get(db)["group_report_names"]:
+        top = sorted(per_pen.items(), key=lambda x: -x[1])[:5]
+        out += [f"### {E('warning')} " + ("Jarimalar" if evening else "Eng ko'p jarima"),
+                _li([f"{M(emps[i].full_name)} — {_som(v)}" for i, v in top])]
+    elif per_pen:  # panel: personal amounts off for group reports
+        out += [f"- Jarima olganlar: **{len(per_pen)}** kishi (ismlar va summalar — shaxsiy chatda)"]
     out += [f"#### {E('idea')} *Manba: TimePay va panel. Hisob-kitob va to'lovni faqat odam tasdiqlaydi.*"]
     return "\n\n".join(out)
 

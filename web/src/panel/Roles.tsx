@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { BotVisibility } from "./BotVisibility";
 import { api, dash } from "../api";
 import { useT } from "../i18n";
 import { Empty, Err, Modal, useLoad } from "../ui";
@@ -137,6 +138,7 @@ export default function Roles() {
           ))}</tbody>
         </table>{users.data?.length === 0 && <Empty />}</div>
       </div>
+      <BotVisibility />
       {role && catalog.data && <RoleEditor role={role === "new" ? null : role} catalog={catalog.data} onClose={() => setRole(null)} onDone={roles.reload} />}
       {user && roles.data && <UserEditor user={user === "new" ? null : user} roles={roles.data} onClose={() => setUser(null)}
         onDone={() => { users.reload(); roles.reload(); }} />}

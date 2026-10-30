@@ -60,10 +60,16 @@ def _is_addressed(msg: Message, me_username: str) -> bool:
 
 
 def _answer_sync(agent: str, tg_id: int, text: str, user_key: str | None = None, group: bool = False) -> str:
+    from ..services import visibility
     with SessionLocal() as db:
         scope = scope_for_telegram(db, tg_id)
-        if group:  # everyone in the group reads the answer: no salary / payroll amounts there, only in private chat
-            scope.payroll = False
+        visibility.apply(db, scope, tg_id, "group" if group else "private")  # panel: who sees what, group vs private
+        if scope.hidden:
+            names = ", ".join(visibility.CATEGORIES[c]["uz"] for c in sorted(scope.hidden))
+            text = (f"[Not shown to this person in this chat (panel setting): {names}. If asked, say it is closed here "
+                    f"and, if it is open in the other chat, suggest asking there.]\n") + text
+        elif group:  # the current setting wins over earlier answers in the shared topic history
+            text = "[Panel setting now: everything may be shown to this person in this group, salaries included.]\n" + text
         return run_agent(db, agent, scope, text, user_key=user_key or f"tg:{tg_id}")
 
 
@@ -224,10 +230,8 @@ def agent_router(agent: str | None) -> Router:
         if hr_group:  # one shared conversation per topic, so the agent remembers what was said there
             thread = m.message_thread_id if m.is_topic_message else None
             topic = await asyncio.to_thread(_topic_name, m.chat.id, thread)
-            ask = (f"[HR group, topic: {topic}. Answer for this topic's subject. Written by {m.from_user.full_name}]\n"
-                   if topic else f"[HR group. Written by {m.from_user.full_name}]\n") + (
-                "[Group chat: never show a person's salary, pay, fines or bonuses here; totals and counts are fine. For "
-                "personal amounts say: «shaxsiy chatda so'rang» / «спросите в личке».]\n\n") + ask
+            ask = (f"[HR group, topic: {topic}. Answer for this topic's subject. Written by {m.from_user.full_name}]\n\n"
+                   if topic else f"[HR group. Written by {m.from_user.full_name}]\n\n") + ask
             key = f"grp:{m.chat.id}:{thread or 0}"
         answer = await asyncio.to_thread(_answer_sync, target, m.from_user.id, ask, key, hr_group)
         await reply_rich(m, answer)

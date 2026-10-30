@@ -34,10 +34,30 @@ def test_group_addressing(monkeypatch):
     assert bot._is_addressed(msg("@hrbot kim kech qoldi?", chat=-200), "hrbot")
 
 
-def test_group_answers_have_no_payroll_rights(db, monkeypatch):
+def test_visibility_group_vs_private(db, monkeypatch):
+    """Default: everything visible. The panel can hide categories per role and per person, separately per chat."""
+    from fastapi.testclient import TestClient
     from app.bots import main as bot
+    from app.main import app
+    c = TestClient(app)
+    admin = {"Authorization": "Bearer " + c.post("/api/auth/login", json={"username": "admin", "password": "admin12345"}).json()["token"]}
     seen = {}
-    monkeypatch.setattr(bot, "run_agent", lambda db, agent, scope, text, user_key: seen.update(p=scope.payroll) or "ok")
+    monkeypatch.setattr(bot, "run_agent", lambda db, agent, scope, text, user_key: seen.update(p=scope.payroll, h=set(scope.hidden)) or "ok")
     owner = next(iter(bot.settings().owner_ids), None) or 1
     bot._answer_sync("hr", owner, "oylik qancha?", "grp:-1:2", True)
-    assert seen["p"] is False                                            # group: payroll tools are not offered
+    assert seen["p"] is True and seen["h"] == set()                     # default: group sees everything
+    cfg = c.get("/api/bot-visibility", headers=admin).json()
+    cfg["settings"]["people"] = {str(owner): {"name": "Owner", "group": ["attendance"], "private": list(cfg["categories"])}}
+    assert c.put("/api/bot-visibility", headers=admin, json=cfg["settings"]).status_code == 200
+    bot._answer_sync("hr", owner, "oylik qancha?", "grp:-1:2", True)
+    assert seen["p"] is False and "payroll" in seen["h"] and "attendance" not in seen["h"]
+    bot._answer_sync("hr", owner, "oylik qancha?", None, False)
+    assert seen["p"] is True and seen["h"] == set()                     # private chat keeps everything
+    from app.agents.registry import AGENTS
+    from app.agents.tools import tools_for
+    from app.rbac import Scope
+    sc = Scope("tg:1", "owner", None, True, hidden={"recruiting"})
+    names = {t.name for t in tools_for(AGENTS["hr"].tools, sc)}
+    assert "job_offer" not in names and "attendance_day" in names
+    hr = {"Authorization": "Bearer " + c.post("/api/auth/login", json={"username": "hr", "password": "demo12345"}).json()["token"]}
+    assert c.get("/api/bot-visibility", headers=hr).status_code == 403  # main admin only
