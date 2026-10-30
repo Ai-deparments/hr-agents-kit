@@ -171,6 +171,12 @@ def _turnover(ctx: Ctx, months: int = 3, by: str = "branch"):
     return analytics.turnover(ctx.db, ctx.scope, max(1, min(months, 24)), by)
 
 
+@tool("weekly_signals", "Per-branch signals: lateness, confirmed absences and early leaves in the last 7 days vs the average "
+      "week of the 4 weeks before (>= 3 cases and >= 2x). A reason to talk, never a decision. In a group chat give only the count.")
+def _weekly_signals(ctx: Ctx):
+    return analytics.weekly_signals(ctx.db, ctx.scope)
+
+
 @tool("vacancies_sla", "Open vacancies with days open, SLA and traffic light.")
 def _vac(ctx: Ctx):
     return analytics.vacancies_sla(ctx.db, ctx.scope)

@@ -35,7 +35,7 @@ AGENTS: dict[str, AgentDef] = {a.name: a for a in [
              ("oylik", "зарплат", "payroll", "salary", "аванс", "штраф", "переработ", "overtime")),
     AgentDef("husayn", "HR analytics", "manager",
              ["headcount", "turnover", "attendance_day", "attendance_rate", "vacancies_sla", "onboarding_status",
-              "documents_expiring", "search_employee", "risk_signals", "pulse_summary", "discipline_ranking"],
+              "documents_expiring", "search_employee", "risk_signals", "pulse_summary", "discipline_ranking", "weekly_signals"],
              {"/tahlil": ("hr_overview", {}), "/turnover": ("turnover", {}), "/shtat": ("headcount", {})},
              ("tahlil", "аналит", "текучест", "turnover", "штат", "headcount", "statist")),
     AgentDef("suhayl", "Employee helpdesk", "employee",

@@ -46,6 +46,18 @@ export default function Analytics() {
               <tbody>{Object.entries(tt.groups).map(([k, v]: any) => <tr key={k}><td>{k}</td><td className="num">{v.left}</td><td className="num">{v.base}</td><td className="small">{v.rate}</td></tr>)}</tbody></table></div>
           </div>
         ))}
+        <div className="card"><h2>{tx.l("Haftalik signallar", "Недельные сигналы", "Weekly signals")}</h2>
+          <div className="muted small" style={{ marginBottom: 8 }}>{a.weekly_signals.period} · {tx.l(
+            "oxirgi 7 kun ≥ 3 holat va oldingi 4 hafta o'rtachasidan ≥ 2×; belgilanmagan kun kelmaslik emas",
+            "последние 7 дней ≥ 3 случаев и ≥ 2× среднего за 4 недели; «не отмечен» ≠ «не пришёл»",
+            "last 7 days ≥ 3 cases and ≥ 2× the average week of the 4 before; not marked ≠ absent")}</div>
+          {a.weekly_signals.signals.length === 0 ? <div className="muted small">{tx.l("Bu hafta signal yo'q", "Сигналов нет", "No signals this week")}</div> :
+            <div className="table-wrap"><table><thead><tr><th>{tx("c_branch")}</th><th>{tx.l("Signal", "Сигнал", "Signal")}</th>
+              <th className="num">{tx.l("7 kun", "7 дней", "Last 7 days")}</th><th className="num">{tx.l("Odatdagi hafta", "Обычная неделя", "Usual week")}</th></tr></thead>
+              <tbody>{a.weekly_signals.signals.map((s: any) => <tr key={s.branch + s.metric}><td>{s.branch}</td>
+                <td>{({ late: tx.l("kechikish", "опоздания", "lateness"), absent: tx.l("kelmaslik", "неявки", "absences"), early_leave: tx.l("erta ketish", "ранние уходы", "early leaves") } as Record<string, string>)[s.metric]}</td>
+                <td className="num"><b>{s.last_7_days}</b></td><td className="num">{s.usual_week}</td></tr>)}</tbody></table></div>}
+        </div>
         <div className="card"><h2>{tx("an_topMissed")}</h2>
           <div className="table-wrap"><table><thead><tr><th>{tx("c_name")}</th><th>{tx("c_branch")}</th><th className="num">{tx("an_missed")}</th><th className="num">{tx("c_late")}</th></tr></thead>
             <tbody>{a.attendance_30d.top.map((r: any) => <tr key={r.full_name}><td>{r.full_name}</td><td>{r.branch}</td><td className="num">{r.missed}</td><td className="num">{r.late}</td></tr>)}</tbody></table></div>

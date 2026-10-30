@@ -2,6 +2,7 @@
 Returns notices; delivery is done by bots/sender.py."""
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass
 from datetime import date, timedelta
 
@@ -9,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..config import cfg
-from ..models import BranchLead, Employee, LeaveRequest, PulseSent
+from ..models import BranchLead, Employee, LeaveRequest, PeriodStatus, PulseSent
 from ..rbac import Scope
 from . import onboarding, payroll, people
 
@@ -18,7 +19,7 @@ SYSTEM = Scope("system", "owner", None, True)
 
 @dataclass
 class Notice:
-    target: str   # "hr" | "branch:<id>" | "employee:<id>"
+    target: str   # "hr" | "tabel_closers" | "branch:<id>" | "employee:<id>"
     kind: str
     text: str
 
@@ -52,6 +53,11 @@ def collect(db: Session, today: date | None = None) -> list[Notice]:
         if pc["count"]:
             out.append(Notice("hr", "payroll", f"💰 Payroll {month}: {pc['count']} issue(s) before payout, "
                                                f"at risk ≈ {pc['amount_at_risk'] or 0:,} {cfg('company.currency', 'UZS')}"))
+
+    # payroll: from the 1st, every day until last month's tabel is closed -> the people who close it (no money in the text)
+    if cfg("payroll.tabel_close_reminder", True):
+        if note := tabel_close_notice(db, today):
+            out.append(note)
 
     # anonymous monthly eNPS (on the configured day) + exit survey for people who left in the last 3 days
     month = today.strftime("%Y-%m")
@@ -88,6 +94,28 @@ def collect(db: Session, today: date | None = None) -> list[Notice]:
         out.append(Notice(f"branch:{r.employee.branch_id}", "request",
                           f"📝 Request #{r.id} ({r.kind}) from {r.employee.full_name} waits for a decision"))
     return out
+
+
+ISSUE_UZ = {"no_contract_salary": "maosh noma'lum", "no_hours": "soat yo'q", "needs_review_days": "tekshirish kerak",
+            "unmarked_shifts": "belgisiz smena", "overtime_over_limit": "ortiqcha ish limitdan oshgan",
+            "absent_3_in_row": "3+ kun ketma-ket kelmagan", "large_bonus": "katta bonus", "overtime_year_cap": "yillik 120 soat",
+            "changed_after_calc": "hisobdan keyin o'zgargan"}
+
+
+def tabel_close_notice(db: Session, today: date) -> Notice | None:
+    """Last month's tabel is still open -> one reminder with the open pre-check issues by type (counts only)."""
+    prev = (today.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
+    p = db.get(PeriodStatus, prev)
+    if p and p.tabel_closed:
+        return None
+    pc = payroll.precheck(db, SYSTEM, prev)
+    if pc["base"].startswith("0 "):
+        return None  # nobody worked that month (new install)
+    by_type = Counter(i["type"] for i in pc["issues"])
+    issues = ", ".join(f"{ISSUE_UZ.get(k, k)} — {v}" for k, v in sorted(by_type.items())) or "yo'q"
+    return Notice("tabel_closers", "tabel_close",
+                  f"📑 {prev} tabeli hali yopilmagan ({(today - today.replace(day=1)).days + 1}-kun). "
+                  f"Ochiq masalalar: {issues}. Panel → Tabel → Oyni yopish.")
 
 
 def branch_lead_telegram_ids(db: Session, branch_id: int) -> list[int]:

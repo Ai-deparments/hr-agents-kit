@@ -101,12 +101,14 @@ payroll:
   late_penalty: { enabled: false, grace_min: 15, per_30_min_share_of_hour: 0.5, max_share_of_salary: 0.10 }
   sales_percent: { enabled: true, default_rate: 0.01 }   # % of personal sales, from CSV/ERP import
   payday: 10                  # day of month salary is paid (precheck reminder 2 days before)
+  tabel_close_reminder: true  # from the 1st, daily at 10:00, until last month's tabel is closed (to HR_HEAD_IDS, else owners)
   allowances: [transport, meal, phone]
 
 reports:
   morning_at: "10:00"
   evening_at: "21:00"
   per_branch_to_heads: true   # each head gets only their pharmacy
+  weekly_signals: { weekday: 0, at: "10:15" }   # last 7 days vs previous 4 weeks per branch (null = off); group: count only
 
 onboarding:
   test_good: 80

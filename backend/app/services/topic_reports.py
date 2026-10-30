@@ -195,3 +195,26 @@ def analytics_evening_md(db: Session, scope: Scope, today: date | None = None) -
     if avg is not None and now < avg - 10:
         out += [f"#### {E('idea')} *Bugun o'rtachadan {avg - now} p.p. past — sababini bo'lim rahbarlaridan so'rang.*"]
     return "\n\n".join(out)
+
+
+SIGNAL_UZ = {"late": "kechikish", "absent": "tasdiqlangan kelmaslik", "early_leave": "erta ketish"}
+
+
+def weekly_signals_md(db: Session, scope: Scope, today: date | None = None, private: bool = False) -> str | None:
+    """Weekly per-branch signals. The group gets one count line; branch names and numbers only in private chats."""
+    w = analytics.weekly_signals(db, scope, today)
+    n = len(w["signals"])
+    if not n:
+        return None
+    a, b = w["period"].split("..")
+    period = f"{date.fromisoformat(a):%d.%m}–{date.fromisoformat(b):%d.%m}"
+    if not private:
+        return (f"## {E('chart_up')} Haftalik signallar — {period}\n\n"
+                f"- Filial signallari: **{n}** (kechikish / kelmaslik / erta ketish odatdagidan 2× ko'p)\n\n"
+                f"#### {E('idea')} *Tafsilotlar shaxsiy xabarda yuborildi.*")
+    return "\n\n".join([
+        f"## {E('chart_up')} Haftalik signallar — {period}",
+        _li([f"{M(s['branch'])}: {SIGNAL_UZ[s['metric']]} **{s['last_7_days']}** (odatdagi hafta: {s['usual_week']})"
+             for s in w["signals"]], 20),
+        f"#### {E('idea')} *Qoida: oxirgi 7 kun ≥ 3 holat va oldingi 4 hafta o'rtachasidan ≥ 2×. "
+        f"Belgilanmagan kun kelmaslik hisoblanmaydi. Gaplashish uchun sabab — qaror emas.*"])

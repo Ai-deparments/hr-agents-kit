@@ -918,6 +918,8 @@ async def send_notifications(sender: Sender) -> None:
         for n in notes:
             if n.target == "hr":
                 ids = sender.management_ids()
+            elif n.target == "tabel_closers":  # HR heads close the tabel; owners when no HR head is set
+                ids = sorted(settings().hr_head_ids) or sorted(settings().owner_ids)
             elif n.target.startswith("branch:"):
                 ids = notifications.branch_lead_telegram_ids(db, int(n.target.split(":")[1]))
             else:
@@ -950,6 +952,11 @@ async def send_weekly(sender: Sender, monday: date | None = None) -> None:
     await sender.report(weekly.week_text(w), (f"hafta-{monday:%Y-%m-%d}.xlsx", weekly.week_excel(w)), weekly.week_md(w), kind="digest")
 
 
+def _md_plain(md: str) -> str:
+    """Rich Markdown -> plain HTML-escaped fallback text (premium emoji become their fallback character)."""
+    return _esc(re.sub(r"!\[([^\]]*)\]\([^)]*\)", r"\1", md).replace("**", "").replace("#", "").replace("\\", ""))
+
+
 async def send_topic_report(sender: Sender, kind: str, evening: bool = False) -> None:
     from ..services import topic_reports as tr
     with SessionLocal() as db:
@@ -959,8 +966,29 @@ async def send_topic_report(sender: Sender, kind: str, evening: bool = False) ->
             fn = {"recruiting": tr.recruiting_md, "onboarding": tr.onboarding_md, "payroll": tr.payroll_md}[kind]
             md = fn(db, SYSTEM, evening=evening)
     if md:
-        plain = re.sub(r"!\[([^\]]*)\]\([^)]*\)", r"\1", md).replace("**", "").replace("#", "").replace("\\", "")
-        await sender.report(_esc(plain), None, md, kind=kind)
+        await sender.report(_md_plain(md), None, md, kind=kind)
+
+
+async def send_weekly_signals(sender: Sender) -> None:
+    """Weekly per-branch signals: one count line to the group; branch lines only privately
+    (HR leaders: all branches, branch heads: their own)."""
+    from ..services import topic_reports as tr
+    with SessionLocal() as db:
+        group = tr.weekly_signals_md(db, SYSTEM)
+        full = tr.weekly_signals_md(db, SYSTEM, private=True)
+        heads = []
+        for lead in db.scalars(select(BranchLead)):
+            emp = db.get(Employee, lead.employee_id)
+            if emp and emp.telegram_id:
+                if md := tr.weekly_signals_md(db, Scope("system", "manager", {lead.branch_id}), private=True):
+                    heads.append((emp.telegram_id, md))
+
+    if group and settings().report_chat_id:
+        await sender.report(_md_plain(group), None, group, kind="analytics")
+    if full:
+        await sender.to_ids(sender.management_ids(), _md_plain(full), rich=full)
+    for tg, md in heads:
+        await sender.to_ids([tg], _md_plain(md), rich=md)
 
 
 async def draft_nudges(sender: Sender) -> None:
@@ -1070,6 +1098,9 @@ async def main() -> None:
     sched.add_job(send_reports, "cron", hour=int(eh), minute=int(em), args=[sender, "evening"])
     sched.add_job(send_weekly, "cron", day_of_week="mon", hour=int(mh), minute=int(mm) + 1, args=[sender])
     sched.add_job(draft_nudges, "cron", day_of_week="mon", hour=int(mh), minute=int(mm) + 5, args=[sender])
+    if ws := cfg("reports.weekly_signals"):
+        wh, wm = str(ws.get("at", "09:15")).split(":")
+        sched.add_job(send_weekly_signals, "cron", day_of_week=int(ws.get("weekday", 0)), hour=int(wh), minute=int(wm), args=[sender])
     # every topic gets a morning and an evening report at the same times as attendance (skipped when nothing to say)
     for kind in ("recruiting", "onboarding", "payroll", "analytics"):
         sched.add_job(send_topic_report, "cron", hour=int(mh), minute=int(mm), args=[sender, kind, False])

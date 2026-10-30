@@ -106,3 +106,50 @@ def overview(db: Session, scope: Scope, today: date | None = None) -> dict:
             "on_shift_today": day["came"], "scheduled_today": day["scheduled"], "late_today": day["late"],
             "unmarked_today": day["unmarked"], "pending_requests": pending, "new_candidates": new_cands,
             "attendance_source": cfg("attendance.source", "telegram"), "branches": rows}
+
+
+# ---------------- weekly per-branch signals ----------------
+
+SIGNAL_METRICS = ("late", "absent", "early_leave")
+
+
+def _early_leave(emp: Employee, d: date, res) -> bool:
+    from datetime import datetime as dt
+    from . import schedules as sch
+    start = sch.planned_start(emp, d)
+    if not start or not res.check_out or res.status not in ("present", "late"):
+        return False
+    planned = sch.planned_hours(emp, d)
+    end = start + timedelta(hours=planned + (sch.lunch_hours(emp) if planned > 5 else 0))
+    grace = int(cfg("attendance.late_grace_min", 10))
+    return dt.fromisoformat(res.check_out) < end - timedelta(minutes=grace)
+
+
+def weekly_signals(db: Session, scope: Scope, today: date | None = None) -> dict:
+    """Per branch: the last 7 days vs the average week of the 4 weeks before. A signal needs >= 3 cases AND >= 2x the usual.
+    'absent' counts only confirmed absences (team lead), never 'not marked'. Built by code, no model."""
+    from . import attendance as att
+    today = today or date.today()
+    start7, start_base = today - timedelta(days=6), today - timedelta(days=34)
+    emps = [e for e in att.employees_in_scope(db, scope) if e.status != "fired" or (e.fire_date and e.fire_date >= start_base)]
+    data = att.AttendanceData(db, [e.id for e in emps], start_base, today)
+    counts = defaultdict(lambda: {m: [0, 0] for m in SIGNAL_METRICS})  # branch -> metric -> [last 7 days, 4 weeks before]
+    for e in emps:
+        b = counts[e.branch.name if e.branch else "—"]
+        d = start_base
+        while d <= today:
+            res = att.compute_day(e, d, data)
+            i = 0 if d >= start7 else 1
+            b["late"][i] += res.status == "late"
+            b["absent"][i] += res.status == "absent"
+            b["early_leave"][i] += _early_leave(e, d, res)
+            d += timedelta(days=1)
+    signals = []
+    for branch, m in sorted(counts.items()):
+        for metric, (now7, base28) in m.items():
+            usual = base28 / 4
+            if now7 >= 3 and now7 >= 2 * usual:
+                signals.append({"branch": branch, "metric": metric, "last_7_days": now7, "usual_week": round(usual, 1)})
+    return {"period": f"{start7.isoformat()}..{today.isoformat()}",
+            "baseline": f"{start_base.isoformat()}..{(start7 - timedelta(days=1)).isoformat()}",
+            "rule": ">= 3 cases and >= 2x the average week of the previous 4 weeks", "branches": len(counts), "signals": signals}

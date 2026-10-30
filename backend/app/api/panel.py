@@ -739,7 +739,8 @@ def analytics_all(months: int = 3, scope: Scope = Depends(require("hr.read")), d
             "headcount_position": analytics.headcount(db, scope, "position"),
             "turnover": analytics.turnover(db, scope, months, "branch"),
             "turnover_region": analytics.turnover(db, scope, months, "region"),
-            "attendance_30d": attendance.attendance_rate(db, scope, 30)}
+            "attendance_30d": attendance.attendance_rate(db, scope, 30),
+            "weekly_signals": analytics.weekly_signals(db, scope)}
 
 
 @router.get("/chats")
