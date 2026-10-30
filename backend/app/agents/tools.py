@@ -654,3 +654,16 @@ def _onb_today(ctx: Ctx):
                                "sent": s.sent_at.strftime("%d.%m")} for s in unseen if mine(s.employee)],
             "on_probation": [e.full_name for e in probation if not e.branch_id or ctx.scope.allows_branch(e.branch_id)],
             "library_size": len(title)}
+
+
+@tool("lateness_alert_rule", "Turn on/off or change the rule 'employee late N times this month -> private Telegram message "
+      "to the owner (to='owner') or to the owner and HR (to='owner_hr')'. Repeats at 2N, 3N. Use when HR/owner asks for it. "
+      "Returns the rule and who is already over the limit (they are NOT re-announced; counting starts now).",
+      {"enabled": {"type": "boolean"}, "late_count": I, "to": S}, min_role="hr_head", required=["enabled"])
+def _late_rule(ctx: Ctx, enabled: bool, late_count: int = 3, to: str = "owner"):
+    from ..services import discipline_alerts as da
+    rule = da.save(ctx.db, enabled, late_count or 3, to or "owner")
+    audit(ctx.db, ctx.scope, "lateness_alert_rule", None, **rule)
+    ctx.db.commit()
+    return {"rule": rule, "already_over_limit": da.over_limit(ctx.db)[:15],
+            "panel": "Davomat → «Kechikish qoidasi»"}

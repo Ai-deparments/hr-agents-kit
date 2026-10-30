@@ -23,7 +23,7 @@ CATEGORIES: dict[str, dict[str, str]] = {
 TOOL_CATEGORY = {
     **{t: "payroll" for t in ("payroll_summary", "payroll_precheck")},
     **{t: "attendance" for t in ("hr_overview", "attendance_day", "attendance_rate", "overtime", "discipline_ranking",
-                                 "employee_month", "attendance_by_department")},
+                                 "employee_month", "attendance_by_department", "lateness_alert_rule")},
     **{t: "people" for t in ("search_employee", "employee_card", "headcount", "turnover", "documents_expiring",
                              "hr_document", "new_hires")},
     **{t: "recruiting" for t in ("vacancies_sla", "vacancies_list", "candidates", "vacancy_draft", "vacancy_write",

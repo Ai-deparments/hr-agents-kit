@@ -65,6 +65,27 @@ class SendIn(BaseModel):
     ids: list[int] = Field(min_length=1, max_length=200)
 
 
+class RuleIn(BaseModel):
+    enabled: bool
+    late_count: int = Field(default=3, ge=1, le=31)
+    to: str = Field(default="owner", pattern="^(owner|owner_hr)$")
+
+
+@router.get("/lateness-rule")
+def lateness_rule(scope: Scope = Depends(require("attendance.write")), db: Session = Depends(get_db)):
+    from ..services import discipline_alerts as da
+    return {"rule": da.get(db), "over_limit": da.over_limit(db)}
+
+
+@router.put("/lateness-rule")
+def lateness_rule_save(body: RuleIn, scope: Scope = Depends(require("attendance.write")), db: Session = Depends(get_db)):
+    from ..services import discipline_alerts as da
+    rule = da.save(db, body.enabled, body.late_count, body.to)
+    audit(db, scope, "lateness_alert_rule", None, **rule)
+    db.commit()
+    return {"rule": rule, "over_limit": da.over_limit(db)}
+
+
 @router.post("/send")
 def send(body: SendIn, scope: Scope = Depends(require("broadcast")), db: Session = Depends(get_db)):
     n = nudges.send(db, scope, body.ids)

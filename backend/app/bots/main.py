@@ -1090,6 +1090,16 @@ async def send_weekly_signals(sender: Sender) -> None:
         await sender.to_ids([tg], _md_plain(md), rich=md)
 
 
+async def lateness_alerts(sender: Sender) -> None:
+    """Rule from the panel / agent: late N times this month -> private message to the owner (and HR if chosen)."""
+    from ..services import discipline_alerts
+    with SessionLocal() as db:
+        msgs = discipline_alerts.check(db)
+        db.commit()
+    for tg, text in msgs:
+        await sender.to_ids([tg], _esc(text))
+
+
 async def draft_nudges(sender: Sender) -> None:
     """Monday: discipline reminder drafts; HR approves them in the panel (nothing reaches employees before that)."""
     from ..services import nudges
@@ -1200,6 +1210,7 @@ async def main() -> None:
     if ws := cfg("reports.weekly_signals"):
         wh, wm = str(ws.get("at", "09:15")).split(":")
         sched.add_job(send_weekly_signals, "cron", day_of_week=int(ws.get("weekday", 0)), hour=int(wh), minute=int(wm), args=[sender])
+    sched.add_job(lateness_alerts, "cron", hour="7-22", minute="*/15", args=[sender])
     # every topic gets a morning and an evening report at the same times as attendance (skipped when nothing to say)
     for kind in ("recruiting", "onboarding", "payroll", "analytics", "sales"):
         sched.add_job(send_topic_report, "cron", hour=int(mh), minute=int(mm), args=[sender, kind, False])

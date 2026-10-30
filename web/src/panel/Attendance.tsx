@@ -3,7 +3,7 @@ import { api, dash, download, monthISO, shiftDay, todayISO } from "../api";
 import { tEnum, useT } from "../i18n";
 import { Empty, Err, ReasonModal, Status, Tile, useLoad } from "../ui";
 import { can, usePanel } from "./ctx";
-import { Nudges } from "./Nudges";
+import { LatenessRule, Nudges } from "./Nudges";
 
 function BranchSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const { dicts } = usePanel();
@@ -27,6 +27,7 @@ export function Attendance() {
   return (
     <div className="stack" style={{ gap: 14 }}>
       {can(me, "broadcast") && <Nudges />}
+      {can(me, "attendance.write") && <LatenessRule />}
       <div className="row">
         <button className="btn sm" onClick={() => setDay(shiftDay(day, -1))}>←</button>
         <input type="date" value={day} onChange={(e) => setDay(e.target.value)} />

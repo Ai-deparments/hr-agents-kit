@@ -58,7 +58,7 @@ AGENTS: dict[str, AgentDef] = {a.name: a for a in [
 AGENTS["hr"].tools = list(dict.fromkeys([t for n in ("hamza", "bexruz", "husayn", "ozoda", "rauf") for t in AGENTS[n].tools
                                          if t != "ask_agent"] + ["vacancies_list", "vacancy_write", "vacancy_publish", "hr_document", "sales_ranking", "hh_search", "interview_slots",
                                           "interview_slots_add", "job_offer", "new_hires", "attendance_by_department",
-                                          "onboarding_today"]))
+                                          "onboarding_today", "lateness_alert_rule"]))
 for _n in ("hamza", "bexruz", "husayn", "ozoda", "rauf"):
     AGENTS["hr"].commands.update(AGENTS[_n].commands)
 
