@@ -77,7 +77,8 @@ def _match_position(db: Session, title: str | None) -> str | None:
 
 
 def snapshot(db: Session, v: Vacancy, author: str, comment: str | None) -> None:
-    db.add(VacancyRevision(vacancy_id=v.id, fields={k: getattr(v, k) for k in FIELDS} | {"branch_id": v.branch_id},
+    db.add(VacancyRevision(vacancy_id=v.id, fields={k: getattr(v, k) for k in FIELDS} | {"branch_id": v.branch_id,
+                                                                                         "ad_custom": bool(v.ad_custom)},
                            ad_text=v.ad_text or "", comment=(comment or "")[:500], author=author))
     db.flush()
     old = list(db.scalars(select(VacancyRevision).where(VacancyRevision.vacancy_id == v.id)
@@ -151,7 +152,12 @@ def rewrite(db: Session, scope: Scope, v: Vacancy, comment: str) -> Vacancy:
 
 
 def revert(db: Session, scope: Scope, v: Vacancy, rev: VacancyRevision) -> Vacancy:
-    return update(db, scope, v, dict(rev.fields), f"revert to #{rev.id}")
+    fields = dict(rev.fields)
+    custom = fields.pop("ad_custom", False)
+    update(db, scope, v, fields, f"revert to #{rev.id}")
+    if custom and rev.ad_text:  # that version had a chosen / edited text: bring it back (re-checked again at publish)
+        v.ad_text, v.ad_custom = rev.ad_text, True
+    return v
 
 
 def _post_channel(v: Vacancy) -> str:

@@ -209,3 +209,15 @@ def test_bot_reply_picks_then_rewrites_checked_text(db, monkeypatch):
     assert bot._vacancy_reply(9999, v.id, "qisqaroq qil") == ("rewritten", None)
     db.expire_all()
     assert db.get(Vacancy, v.id).ad_text.startswith("Bot studio cashier. 4 200 000")
+
+
+def test_revert_brings_back_a_chosen_text(db):
+    from app.models import VacancyRevision
+    v = _draft(db, title="Revert cashier")
+    vacancies.set_ad(db, HR, v, "Revert cashier. 4 200 000 UZS.", "variant 1")
+    rev = db.scalar(select(VacancyRevision).where(VacancyRevision.vacancy_id == v.id).order_by(VacancyRevision.id.desc()))
+    vacancies.use_template(db, HR, v)
+    assert not v.ad_custom
+    vacancies.revert(db, HR, v, rev)
+    assert v.ad_custom and v.ad_text.startswith("Revert cashier. 4 200 000")
+    db.rollback()
