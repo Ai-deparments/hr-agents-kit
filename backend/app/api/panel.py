@@ -460,9 +460,10 @@ class DecideIn(BaseModel):
 
 @router.post("/requests/{rid}/decide")
 def requests_decide(rid: int, body: DecideIn, scope: Scope = Depends(require("requests.decide")), db: Session = Depends(get_db)):
-    r = _guard(people.decide_request, db, scope, rid, body.approve, body.reason)
+    from ..services import requests_flow
+    r = _guard(requests_flow.apply_decision, db, scope, rid, body.approve, body.reason)  # + employee notice, PDFs
     db.commit()
-    return {"id": r.id, "status": r.status}
+    return {"id": r["id"], "status": r["status"]}
 
 
 @router.get("/approvals")

@@ -13,12 +13,14 @@ KEY = "report_topics"
 KINDS = {
     "attendance": r"(davomat|kechik|tabel|boshli|посещ|опозд|табел|начальник|attendance)",
     "analytics": r"(analit|аналит|tahlil)",
+    "sales": r"(analit|аналит|tahlil)",  # sales agents ranking goes to the analytics topic
     "recruiting": r"(vakans|nomzod|rekrut|yollash|ваканс|кандидат|найм|подбор|recruit|hh)",
     "onboarding": r"(onboard|adapt|адапт|o'?qit|обучен|yangi xodim|новичк)",
     "documents": r"(hujjat|документ|doc)",
     "payroll": r"(oylik|maosh|зарплат|payroll|kpi|бонус)",
     "digest": r"(boshli|начальник|hisobot|отч[её]т|report|ceo|digest|haftalik|недел)",
 }
+ALIAS = {"sales": "analytics"}  # a kind without its own panel mapping follows this kind's mapping
 
 
 def _get(db: Session) -> dict:
@@ -49,6 +51,8 @@ def thread_for(db: Session, kind: str) -> int | None:
     """Explicit map (panel) -> topic name match -> default reports topic."""
     v = _get(db)
     if (m := v.get("map", {}).get(kind)) is not None:
+        return int(m)
+    if kind in ALIAS and (m := v.get("map", {}).get(ALIAS[kind])) is not None:
         return int(m)
     pat = KINDS.get(kind)
     if pat:

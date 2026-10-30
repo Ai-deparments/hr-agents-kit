@@ -190,6 +190,14 @@ def trend(month: str | None = None, months: int = 6, department_id: int | None =
     return kpi.trend(db, scope, _months_back(min(max(months, 2), 12), _month(month)), department_id)
 
 
+@router.get("/sales")
+def sales(month: str | None = None, branch_id: int | None = None,
+          scope: Scope = Depends(require("analytics")), db: Session = Depends(get_db)):
+    """Sales agents ranking (Smartup): amount, share, Δ vs previous month, ABC, 80/20."""
+    from ..services import sales_kpi
+    return sales_kpi.ranking(db, scope, _month(month), branch_id)
+
+
 @router.get("/settings")
 def settings_get(scope: Scope = Depends(require("hr.read")), db: Session = Depends(get_db)):
     return kpi.settings(db)

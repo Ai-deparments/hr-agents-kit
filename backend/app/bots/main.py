@@ -31,22 +31,49 @@ log = logging.getLogger("bots")
 SYSTEM = Scope("system", "owner", None, True)
 
 
+def _real_reply(msg: Message) -> Message | None:
+    """In forum topics every message 'replies' to the topic's first message — that is not a real reply."""
+    r = msg.reply_to_message
+    if not r or (msg.is_topic_message and r.message_id == msg.message_thread_id):
+        return None
+    return r
+
+
+def is_hr_group(msg: Message) -> bool:
+    return msg.chat.id == settings().report_chat_id
+
+
+THANKS_RE = re.compile(r"^(ok|ок|okey|xo'p|xop|rahmat|raxmat|спасибо|спс|ясно|понял|tushunarli|\+|👍|🙏|👌)\W*$")
+
+
 def _is_addressed(msg: Message, me_username: str) -> bool:
     if msg.chat.type == "private":
         return True
     text = msg.text or ""
-    return f"@{me_username}" in text or bool(msg.reply_to_message and msg.reply_to_message.from_user
-                                             and msg.reply_to_message.from_user.username == me_username)
+    r = _real_reply(msg)
+    if f"@{me_username}" in text or bool(r and r.from_user and r.from_user.username == me_username):
+        return True
+    # the HR department group: the agent answers anything that is not people talking to each other or a short "ok"
+    if is_hr_group(msg) and not (msg.from_user and msg.from_user.is_bot):
+        return not (r and r.from_user and not r.from_user.is_bot) and not THANKS_RE.match(text.strip().lower())
+    return False
 
 
-def _answer_sync(agent: str, tg_id: int, text: str) -> str:
+def _answer_sync(agent: str, tg_id: int, text: str, user_key: str | None = None) -> str:
     with SessionLocal() as db:
         scope = scope_for_telegram(db, tg_id)
-        return run_agent(db, agent, scope, text, user_key=f"tg:{tg_id}")
+        return run_agent(db, agent, scope, text, user_key=user_key or f"tg:{tg_id}")
+
+
+def _topic_name(chat_id: int, thread_id: int | None) -> str | None:
+    from ..services import topics
+    with SessionLocal() as db:
+        v = topics.overview(db)
+    return v["topics"].get(str(thread_id)) if thread_id and v.get("chat_id") == chat_id else None
 
 
 def _replied_text(m: Message) -> str:
-    r = m.reply_to_message
+    r = _real_reply(m)
     return (r.text or r.caption or "") if r else ""
 
 
@@ -146,7 +173,16 @@ def agent_router(agent: str | None) -> Router:
                 return await m.answer(L("✅ Rahmat, belgilandi.", "✅ Спасибо, отмечено."))
         with SessionLocal() as db:
             scope = scope_for_telegram(db, uid)
-        if m.chat.type == "private" and agent in (None, "rauf") and scope.at_least("hr_head"):
+        hr_group = is_hr_group(m)
+        if hr_group and not scope.at_least("manager"):
+            return  # only managers / HR / owner get answers in the HR group; others are ignored silently
+        if (m.chat.type == "private" or hr_group) and scope.at_least("hr_head"):
+            rep = _real_reply(m)  # a reply counts only to this bot's own notice
+            replied = _replied_text(m) if rep and rep.from_user and rep.from_user.username == me.username else ""
+            res = await asyncio.to_thread(_request_decide, uid, text, replied)
+            if res is not None:
+                return await m.answer(_request_answer(res))
+        if (m.chat.type == "private" or hr_group) and agent in (None, "rauf") and scope.at_least("hr_head"):
             card = re.search(r"📝 #(\d{1,9})", _replied_text(m))
             if card:
                 VDRAFT[uid] = int(card.group(1))
@@ -168,7 +204,7 @@ def agent_router(agent: str | None) -> Router:
                 return await m.answer("🔒 Эта функция вам пока не открыта — обратитесь в HR." if _ru(m) else
                                       "🔒 Bu funksiya sizga hali ochilmagan — HR'ga murojaat qiling.")
         cmd = text.split()[0].split("@")[0].lower() if text else ""
-        if m.chat.type != "private" and not (target == "hamza" and cmd in GROUP_COMMANDS):
+        if m.chat.type != "private" and not hr_group and not (target == "hamza" and cmd in GROUP_COMMANDS):
             return await m.answer("🔒 Личные данные в группе не выдаются — напишите мне в личку." if _ru(m) else
                                   "🔒 Shaxsiy ma'lumotlar guruhda berilmaydi — menga shaxsiy chatda yozing.")
         if not _llm_quota_ok(m.from_user.id):
@@ -177,10 +213,17 @@ def agent_router(agent: str | None) -> Router:
             with SessionLocal() as db:
                 if not scope_for_telegram(db, m.from_user.id).at_least("hr_head"):
                     return await start_interview(m)
-        await bot.send_chat_action(m.chat.id, "typing")
+        await bot.send_chat_action(m.chat.id, "typing", message_thread_id=m.message_thread_id if m.is_topic_message else None)
         quoted = _replied_text(m)
         ask = f"[Reply to this earlier message]\n{quoted[:2000]}\n[/Reply]\n\n{text}" if quoted else text
-        answer = await asyncio.to_thread(_answer_sync, target, m.from_user.id, ask)
+        key = None
+        if hr_group:  # one shared conversation per topic, so the agent remembers what was said there
+            thread = m.message_thread_id if m.is_topic_message else None
+            topic = await asyncio.to_thread(_topic_name, m.chat.id, thread)
+            ask = (f"[HR group, topic: {topic}. Answer for this topic's subject. Written by {m.from_user.full_name}]\n\n"
+                   if topic else f"[HR group. Written by {m.from_user.full_name}]\n\n") + ask
+            key = f"grp:{m.chat.id}:{thread or 0}"
+        answer = await asyncio.to_thread(_answer_sync, target, m.from_user.id, ask, key)
         await reply_rich(m, answer)
 
     return r
@@ -259,7 +302,8 @@ async def reply_rich(m: Message, answer: str) -> None:
     from aiogram.types import InputRichMessage
     if answer and len(answer) <= 32000:
         try:
-            await m.bot.send_rich_message(m.chat.id, InputRichMessage(markdown=answer))
+            await m.bot.send_rich_message(m.chat.id, InputRichMessage(markdown=answer),
+                                          message_thread_id=m.message_thread_id if m.is_topic_message else None)
             return
         except Exception as e:
             log.warning("rich reply failed, plain text: %s", e)
@@ -275,6 +319,33 @@ def _ru(m) -> bool:
 
 def _esc(s: str) -> str:
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+# ---------------- employee requests: HR decides in words ----------------
+
+def _request_decide(tg_id: int, text: str, replied: str) -> dict | None:
+    from ..services import requests_flow
+    with SessionLocal() as db:
+        return requests_flow.handle(db, scope_for_telegram(db, tg_id), text, replied)
+
+
+def _request_answer(res: dict) -> str:
+    rid = res["id"]
+    if res.get("error"):
+        e = res["error"]
+        if e == "Already decided":
+            return L(f"ℹ️ #{rid} allaqachon hal qilingan.", f"ℹ️ #{rid} уже решена.")
+        if e == "Request not found":
+            return L(f"⚠️ #{rid} so'rov topilmadi.", f"⚠️ Заявка #{rid} не найдена.")
+        return f"⚠️ #{rid}: {_esc(e)}"
+    to = (L("xodimga yuborildi", "отправлено сотруднику") if res["sent"]
+          else L("xodimning Telegrami ulanmagan", "у сотрудника не подключён Telegram"))
+    if res["status"] == "approved":
+        out = L(f"✅ #{rid} tasdiqlandi — {to}", f"✅ #{rid} одобрена — {to}")
+        if res.get("order"):
+            out += L("; buyruq imzoga yuborildi", "; приказ отправлен на подпись")
+        return out
+    return L(f"❌ #{rid} rad etildi — {to}", f"❌ #{rid} отклонена — {to}")
 
 
 # ---------------- Rauf candidate interview (live dialog instead of a form) ----------------
@@ -814,7 +885,9 @@ async def send_outbox(sender: Sender) -> None:
                     if o.file_path.lower().endswith((".mp4", ".mov", ".m4v", ".webm")):
                         await b.send_video(o.telegram_id, f, caption=cap, supports_streaming=True)
                     else:
-                        await b.send_document(o.telegram_id, f, caption=cap)
+                        from ..services import topics
+                        thread = topics.thread_for(db, o.topic) if o.topic else None
+                        await b.send_document(o.telegram_id, f, caption=cap, message_thread_id=thread)
                 else:
                     from ..services import topics
                     thread = topics.thread_for(db, o.topic) if o.topic else None
@@ -963,7 +1036,7 @@ async def send_topic_report(sender: Sender, kind: str, evening: bool = False) ->
         if kind == "analytics":
             md = tr.analytics_evening_md(db, SYSTEM) if evening else tr.analytics_md(db, SYSTEM)
         else:
-            fn = {"recruiting": tr.recruiting_md, "onboarding": tr.onboarding_md, "payroll": tr.payroll_md}[kind]
+            fn = {"recruiting": tr.recruiting_md, "onboarding": tr.onboarding_md, "payroll": tr.payroll_md, "sales": tr.sales_md}[kind]
             md = fn(db, SYSTEM, evening=evening)
     if md:
         await sender.report(_md_plain(md), None, md, kind=kind)
@@ -1102,7 +1175,7 @@ async def main() -> None:
         wh, wm = str(ws.get("at", "09:15")).split(":")
         sched.add_job(send_weekly_signals, "cron", day_of_week=int(ws.get("weekday", 0)), hour=int(wh), minute=int(wm), args=[sender])
     # every topic gets a morning and an evening report at the same times as attendance (skipped when nothing to say)
-    for kind in ("recruiting", "onboarding", "payroll", "analytics"):
+    for kind in ("recruiting", "onboarding", "payroll", "analytics", "sales"):
         sched.add_job(send_topic_report, "cron", hour=int(mh), minute=int(mm), args=[sender, kind, False])
         sched.add_job(send_topic_report, "cron", hour=int(eh), minute=int(em), args=[sender, kind, True])
     sched.add_job(send_notifications, "cron", hour=10, minute=0, args=[sender])

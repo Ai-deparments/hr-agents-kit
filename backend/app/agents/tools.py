@@ -322,7 +322,9 @@ def _my_req(ctx: Ctx, kind: str, date_from: str | None = None, date_to: str | No
         r = people.create_request(ctx.db, ctx.scope, _self(ctx), kind, _d(date_from), _d(date_to), comment, channel="suhayl")
     except ValueError as e:
         return {"error": str(e)}
-    return {"request_id": r.id, "status": r.status, "note": "A manager decides, not the bot."}
+    from ..services import requests_flow
+    requests_flow.notify_created(ctx.db, ctx.scope, r)  # HR gets a short notice and answers in words
+    return {"request_id": r.id, "status": r.status, "note": "HR decides, not the bot. HR has been notified."}
 
 
 @tool("find_sop", "Search the SOP / rules library by keyword; defaults to the user's position. Never invent rule text.",
@@ -517,3 +519,18 @@ def _course_start(ctx: Ctx, employee_id: int):
     sent = onboarding_media.deliver_due(ctx.db)
     ctx.db.commit()
     return {"scheduled": n, "sent_now": sent, "telegram_linked": e.telegram_id is not None}
+
+
+# ---------------- sales agents (Smartup) ----------------
+
+@tool("sales_ranking", "Sales agents ranking for a month (from Smartup): amount, share, rank, change vs previous month, "
+      "ABC class and the 80/20 fact. Unknown = null, never invent numbers; plan only if configured. Read-only.",
+      {"month": {**S, "description": "YYYY-MM, default this month (month to date)"}, "branch_id": I, "limit": I})
+def _sales_ranking(ctx: Ctx, month: str | None = None, branch_id: int | None = None, limit: int = 20):
+    from ..services import sales_kpi
+    if month and not (len(month) == 7 and month[4] == "-" and month.replace("-", "").isdigit()):
+        raise ValueError("month must be YYYY-MM")
+    r = sales_kpi.ranking(ctx.db, ctx.scope, month, branch_id)
+    lim = max(1, min(limit, 60))
+    r["rows"] = r["rows"][:lim] if r["n"] <= lim else r["rows"][:lim - 5] + r["rows"][-5:]  # always keep the bottom 5
+    return r

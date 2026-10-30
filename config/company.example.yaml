@@ -104,6 +104,9 @@ payroll:
   tabel_close_reminder: true  # from the 1st, daily at 10:00, until last month's tabel is closed (to HR_HEAD_IDS, else owners)
   allowances: [transport, meal, phone]
 
+sales:                        # sales agents ranking (Smartup import)
+  monthly_plan: null          # total plan for all agents: a number, or {"2026-10": 3000000000}; null = no plan shown
+
 reports:
   morning_at: "10:00"
   evening_at: "21:00"

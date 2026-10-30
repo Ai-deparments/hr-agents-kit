@@ -14,3 +14,21 @@ def test_routes_by_topic_name(db, monkeypatch):
     assert topics.thread_for(db, "onboarding") == 8
     assert topics.thread_for(db, "digest") == 6
     assert not topics.learn(db, -1001234567890, 2, "Davomat")           # unchanged -> no write
+
+
+def test_group_addressing(monkeypatch):
+    from types import SimpleNamespace as N
+    from app.bots import main as bot
+    monkeypatch.setattr(bot, "is_hr_group", lambda m: m.chat.id == -100)
+    human, me = N(is_bot=False, username="ali"), N(is_bot=True, username="hrbot")
+    root = N(message_id=6, from_user=human, text=None, caption=None)
+
+    def msg(text, chat=-100, reply=None, topic=True):
+        return N(chat=N(id=chat, type="supergroup"), text=text, from_user=human, is_topic_message=topic,
+                 message_thread_id=6, reply_to_message=reply or root)
+    assert bot._is_addressed(msg("kim kech qoldi?"), "hrbot")                       # plain message in a topic
+    assert not bot._is_addressed(msg("rahmat"), "hrbot")                            # short thanks: silent
+    assert not bot._is_addressed(msg("men ham", reply=N(message_id=9, from_user=human)), "hrbot")  # people talking
+    assert bot._is_addressed(msg("davom et", reply=N(message_id=9, from_user=me)), "hrbot")       # reply to the bot
+    assert not bot._is_addressed(msg("kim kech qoldi?", chat=-200), "hrbot")       # other groups: only on mention
+    assert bot._is_addressed(msg("@hrbot kim kech qoldi?", chat=-200), "hrbot")

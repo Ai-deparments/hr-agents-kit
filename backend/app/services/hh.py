@@ -27,7 +27,9 @@ def _token_file() -> Path | None:
 
 
 def demo() -> bool:
-    return os.getenv("HH_DEMO", "0") == "1"
+    """Sample résumés only until the real token appears: once the employer connects hh.uz, live mode switches on by itself."""
+    f = _token_file()
+    return os.getenv("HH_DEMO", "0") == "1" and not (f and f.is_file())
 
 
 def status() -> dict:

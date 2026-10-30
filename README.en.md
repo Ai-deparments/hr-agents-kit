@@ -71,6 +71,13 @@ Everything is limited by branch scope.
 
 Upgrade from v0.3: see [docs/IMPROVEMENTS.md](docs/IMPROVEMENTS.md#v031-2026-10-30).
 
+### New in v0.3.2
+
+- **Employee requests in words:** the employee asks the bot (certificate, vacation…), HR gets a notice in the group topic and replies "tasdiqlayman" or "rad: reason"; the employee gets the answer and the certificate PDF, the leave order goes to the documents topic for signature. Panel decisions notify the same way.
+- **The agent answers in the HR group**, in the same topic and with the topic as context; silent when people talk to each other.
+- **Sales agents ranking** from Smartup: month-to-date sales, share, ABC, 80/20, top and bottom 5 — analytics topic morning and evening, and a KPI page card.
+- **hh.uz:** demo mode switches off by itself once the employer grants access.
+
 ## Built-in principles
 
 - **Seven decisions are made by a person only:** payroll approval, deductions, contract change, hiring, firing, mass broadcast, request approval.

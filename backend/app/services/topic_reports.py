@@ -218,3 +218,37 @@ def weekly_signals_md(db: Session, scope: Scope, today: date | None = None, priv
              for s in w["signals"]], 20),
         f"#### {E('idea')} *Qoida: oxirgi 7 kun ≥ 3 holat va oldingi 4 hafta o'rtachasidan ≥ 2×. "
         f"Belgilanmagan kun kelmaslik hisoblanmaydi. Gaplashish uchun sabab — qaror emas.*"])
+
+
+def _mln(n: int) -> str:
+    return f"{n / 1_000_000:,.1f}".replace(",", " ").replace(".", ",") + " mln"
+
+
+def _pct(v: float | None) -> str:
+    return "—" if v is None else f"{v:.1f}".replace(".", ",") + "%"
+
+
+def sales_md(db: Session, scope: Scope, today: date | None = None, evening: bool = False) -> str | None:
+    """Sales agents, month to date. Morning: top 5 / bottom 5, ABC, 80/20. Evening: only when an import changed sales today."""
+    from . import sales_kpi
+    today = today or date.today()
+    if evening and not sales_kpi.changed_on(db, today):
+        return None
+    r = sales_kpi.ranking(db, scope, today.strftime("%Y-%m"), today=today)
+    if not r["n"]:
+        return None
+    rows, n, p = r["rows"], r["n"], r["pareto"]
+    lines = [f"Jami sotuv: **{_mln(r['total'])}**", f"Sotuvi bor agent: **{n}**"]
+    if r["plan"]:
+        lines.append(f"Reja: {_mln(r['plan'])} — bajarildi **{_pct(r['plan_pct'])}**")
+    lines.append(f"ABC: A **{r['counts']['A']}** · B **{r['counts']['B']}** · C **{r['counts']['C']}**")
+    head = "yangilandi" if evening else "ertalab"
+    out = [f"## {E('moon' if evening else 'chart_up')} Savdo agentlari — {today:%d.%m}, {head}", _li(lines),
+           f"### {E('trophy')} Eng yaxshi 5",
+           _li([f"`{x['rank']}` {M(x['full_name'])} — **{_mln(x['amount'])}** ({_pct(x['share'])})" for x in rows[:5]])]
+    if n > 5:
+        out += [f"### {E('chart_down')} Eng past 5",
+                _li([f"`{x['rank']}` {M(x['full_name'])} — {_mln(x['amount'])} ({_pct(x['share'])})" for x in rows[max(5, n - 5):]])]
+    out += [f"#### {E('idea')} *80/20: top {p['top_n']} agent ({p['top_pct']}%) = sotuvning **{_pct(p['top_share'])}**. "
+            f"Oy davom etmoqda — {today:%d.%m} holatiga, Smartup.*"]
+    return "\n\n".join(out)

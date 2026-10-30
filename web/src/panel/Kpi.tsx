@@ -1,5 +1,5 @@
 import { useContext, useMemo, useState } from "react";
-import { api, download, monthISO } from "../api";
+import { api, download, money, monthISO } from "../api";
 import { LangCtx, useT } from "../i18n";
 import { Ic } from "../icons";
 import { Empty, Err, Modal, ReasonModal, useLoad } from "../ui";
@@ -16,6 +16,11 @@ type Abc = { rows: AbcRow[]; total: number; n: number; too_few: boolean; counts:
   class_share: Record<string, number>; pareto: { top_pct: number; top_n: number; top_share: number | null };
   settings: { abc_a: number; abc_b: number; pareto_top: number; min_base: number }; missing: number };
 type Trend = { month: string; avg: number | null; scored: number; total: number }[];
+type SalesRow = { rank: number; employee_id: number; full_name: string; branch: string | null; amount: number; share: number;
+  class: "A" | "B" | "C"; prev_amount: number | null; delta_pct: number | null };
+type Sales = { month: string; prev_month: string; partial: boolean; n: number; total: number | null; delta_pct: number | null;
+  counts: Record<string, number>; pareto: { top_pct: number; top_n: number; top_share: number | null };
+  plan: number | null; plan_pct: number | null; rows: SalesRow[] };
 type FileRow = { id: number; title: string; month: string | null; kind: string; filename: string; size: number; uploaded_by: string; created_at: string };
 
 const T = {
@@ -40,6 +45,40 @@ const T = {
 };
 
 const fmt = (v: number | null | undefined, d = 1) => (v === null || v === undefined ? "—" : v.toLocaleString("ru-RU", { maximumFractionDigits: d }));
+
+/** Sales agents ranking (Smartup): amount, share, Δ vs previous month, ABC. Unknown = "—". */
+function SalesRank({ month }: { month: string }) {
+  const t = useT();
+  const r = useLoad<Sales>(`/api/kpi/sales?month=${month}`, [month]);
+  const d = r.data;
+  const pct = (v: number | null) => (v === null ? "—" : `${v > 0 ? "+" : ""}${fmt(v)}%`);
+  return (
+    <section className="card">
+      <div className="card-h"><span className="card-t">{t.l("Savdo agentlari reytingi", "Рейтинг торговых агентов", "Sales agents ranking")}</span>
+        <span className="card-s">{d && d.n ? `${d.n} · ${money(d.total)} · A ${d.counts.A} / B ${d.counts.B} / C ${d.counts.C}` +
+          (d.pareto.top_share !== null ? ` · ${t.l("top", "топ", "top")} ${d.pareto.top_n} = ${fmt(d.pareto.top_share)}%` : "") +
+          (d.plan ? ` · ${t.l("reja", "план", "plan")} ${fmt(d.plan_pct)}%` : "") +
+          (d.partial ? ` · ${t.l("oy davom etmoqda", "месяц не закрыт", "month in progress")}` : "") : ""}</span></div>
+      <Err e={r.error} />
+      {d && d.rows.length ? (
+        <div className="tbl-wrap"><table className="tbl">
+          <thead><tr><th>#</th><th>{t.l("Agent", "Агент", "Agent")}</th><th className="r">{t.l("Sotuv", "Продажи", "Sales")}</th>
+            <th className="r">{t.l("Ulush", "Доля", "Share")}</th><th className="r ph-hide">Δ {d.prev_month}</th><th>ABC</th></tr></thead>
+          <tbody>{d.rows.map((x) => (
+            <tr key={x.employee_id}>
+              <td className="muted">{x.rank}</td>
+              <td>{x.full_name}<span className="sub">{x.branch}</span></td>
+              <td className="r">{money(x.amount)}</td>
+              <td className="r">{fmt(x.share)}%</td>
+              <td className="r ph-hide">{pct(x.delta_pct)}</td>
+              <td><span className={`badge ${x.class === "A" ? "b-info" : x.class === "C" ? "" : "b-ok"}`}>{x.class}</span></td>
+            </tr>
+          ))}</tbody>
+        </table></div>
+      ) : <Empty text={t.l("Bu oy uchun savdo ma'lumoti yo'q", "Нет данных о продажах за месяц", "No sales data for this month")} />}
+    </section>
+  );
+}
 
 /** Pareto chart: bars sorted desc (coloured by class) + cumulative line + A/B threshold lines. */
 function Pareto({ abc }: { abc: Abc }) {
@@ -167,6 +206,7 @@ function Dashboard({ month, dept, s }: { month: string; dept: string; s: typeof 
           </table></div>
         ) : <Empty text={s.noData} />}
       </section>
+      {can(me, "analytics") && <SalesRank month={month} />}
     </>
   );
 }

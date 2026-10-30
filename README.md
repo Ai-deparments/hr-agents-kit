@@ -88,6 +88,13 @@ Hammasi filial bo'yicha ruxsat bilan cheklangan.
 
 v0.3 dan yangilash va yangi `CAMERA_WEBHOOK_SECRET` (faqat AI kamera bo'lsa): [docs/IMPROVEMENTS.md](docs/IMPROVEMENTS.md#v031-2026-10-30).
 
+### v0.3.2 da yangi
+
+- **Xodim so'rovlari so'z bilan.** Xodim botga «ma'lumotnoma kerak» yoki «ta'til 5–10 noyabr» deb yozadi → HR guruh mavzusiga xabar keladi → HR shu xabarga «tasdiqlayman» yoki «rad: sabab» deb javob beradi → xodimga javob va ma'lumotnoma PDF yuboriladi; ta'til buyrug'i imzo uchun «hujjatlar» mavzusiga tushadi. Paneldagi qaror ham xuddi shunday xabar beradi.
+- **Agent guruhda javob beradi.** HR guruhida rahbar va HR yozgan savollarga o'sha mavzuning o'zida, mavzu konteksti bilan javob beradi; odamlar o'zaro gaplashsa yoki «rahmat» desa — jim.
+- **Savdo agentlari reytingi** (Smartup): oy boshidan sotuv, ulush, ABC, 80/20, eng yaxshi va eng past 5 — tahlil mavzusiga ertalab va kechqurun, panelda KPI sahifasida.
+- **hh.uz** ish beruvchi ruxsat bergach demo rejim o'zi o'chadi.
+
 ### Qoidalar
 
 - **7 qarorni faqat inson qabul qiladi**: oylikni tasdiqlash, ushlab qolish, shartnomani o'zgartirish, ishga olish, bo'shatish, ommaviy xabar va arizani tasdiqlash.
@@ -209,6 +216,13 @@ Stek va kod qoidalari: [`.claude/skills/default-stack`](.claude/skills/default-s
 - **Отчёты.** Зарплата: с 1-го числа каждый день, пока табель прошлого месяца не закрыт (без сумм). Аналитика: недельные сигналы по филиалам (последние 7 дней ≥ 3 и ≥ 2× среднего за 4 недели) — в группу только число, по филиалам — в личку.
 
 Обновление с v0.3 и новая переменная `CAMERA_WEBHOOK_SECRET` (только если есть AI-камера): [docs/IMPROVEMENTS.md](docs/IMPROVEMENTS.md#v031-2026-10-30).
+
+### Новое в v0.3.2
+
+- **Заявки сотрудников словами.** Сотрудник пишет боту «нужна справка» или «отпуск 5–10 ноября» → уведомление в тему HR-группы → HR отвечает на него «tasdiqlayman» или «rad: причина» → сотруднику уходит ответ и справка PDF; приказ об отпуске — в тему «документы» на подпись. Решение в панели уведомляет так же.
+- **Агент отвечает в группе.** В HR-группе отвечает руководителям и HR прямо в теме, с учётом темы; молчит, когда люди говорят между собой или пишут «спасибо».
+- **Рейтинг торговых агентов** (Smartup): продажи с начала месяца, доля, ABC, 80/20, топ и аутсайдеры — в тему аналитики утром и вечером, в панели на странице KPI.
+- **hh.uz:** демо-режим выключается сам, когда работодатель дал доступ.
 
 ### Принципы
 

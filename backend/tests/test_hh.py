@@ -34,3 +34,13 @@ def test_hh_demo_search_and_take(monkeypatch):
     assert next(x for x in c.get("/api/hh/search?text=farmatsevt", headers=rec).json()["items"] if x["id"] == it["id"])["taken"]
     cand = next(x for x in c.get("/api/candidates", headers=rec).json() if x["id"] == t.json()["id"])
     assert cand["source"] == "hh" and cand["breakdown"]["hh_url"] is None  # non-hh URL dropped
+
+
+def test_demo_turns_off_when_token_appears(monkeypatch, tmp_path):
+    from app.services import hh
+    f = tmp_path / "hh_token.json"
+    monkeypatch.setenv("HH_DEMO", "1")
+    monkeypatch.setenv("HH_TOKEN_FILE", str(f))
+    assert hh.demo()
+    f.write_text('{"access_token": "x", "expires_at": 9999999999}')
+    assert not hh.demo() and hh.status()["mode"] == "live"
