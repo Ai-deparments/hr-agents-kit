@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { api, dash } from "../api";
 import { useT } from "../i18n";
-import { Empty, Err, Light, Modal, Tile, useLoad } from "../ui";
+import { Empty, Err, Light, Modal, ReasonModal, Tile, useLoad } from "../ui";
 import { can, usePanel } from "./ctx";
 import { HrDocs } from "./HrDocs";
 
@@ -18,9 +18,11 @@ export function Onboarding() {
       {s && <div className="grid tiles">
         <Tile label={t("ob_on")} value={s.total} /><Tile label={t("ob_behind")} value={s.behind} />
         <Tile label={t("ob_noMentor")} value={s.no_mentor} /><Tile label={t("ob_noTest")} value={s.no_test} />
+        <Tile label={t.l("Boshlash kutilmoqda", "Ждут старта", "Waiting to start")} value={s.waiting} />
       </div>}
       <div className="note">{t("ob_note")}</div>
       <Err e={error || err} />
+      <Waiting write={can(me, "onboarding")} onChanged={reload} />
       <div className="card">
         <div className="row" style={{ marginBottom: 10 }}><h2 style={{ margin: 0 }}>{t("ob_plans")}</h2><span className="spacer" />
           {can(me, "onboarding") && <button className="btn primary" onClick={() => setAdding(true)}>{t("ob_addBtn")}</button>}</div>
@@ -57,6 +59,58 @@ export function Onboarding() {
         </div>
       </div>
       {adding && <AddPlan onClose={() => setAdding(false)} onDone={reload} />}
+    </div>
+  );
+}
+
+/** Hired candidates waiting for the employee card + 30/60/90 plan: one click to start, or dismiss with a reason. */
+function Waiting({ write, onChanged }: { write: boolean; onChanged: () => void }) {
+  const t = useT();
+  const { dicts } = usePanel();
+  const w = useLoad<any[]>("/api/onboarding/waiting");
+  const [start, setStart] = useState<any | null>(null);
+  const [dismiss, setDismiss] = useState<any | null>(null);
+  const [f, setF] = useState<any>({});
+  const [err, setErr] = useState<string | null>(null);
+  const done = () => { w.reload(); onChanged(); setStart(null); setDismiss(null); setF({}); };
+  if (!w.data?.length) return <Err e={w.error} />;
+  return (
+    <div className="card">
+      <h2>{t.l("Ishga olingan — boshlash kutilmoqda", "Нанятые — ждут старта", "Hired — waiting to start")}</h2>
+      <Err e={err} />
+      <div className="table-wrap"><table>
+        <thead><tr><th>{t("c_name")}</th><th>{t.l("Vakansiya", "Вакансия", "Vacancy")}</th><th>{t("c_branch")}</th>
+          <th className="num">{t.l("Kun", "Дней", "Days")}</th><th /></tr></thead>
+        <tbody>{w.data.map((h) => (
+          <tr key={h.id}><td><b>{h.full_name}</b></td><td className="small">{dash(h.vacancy)}</td><td className="small">{dash(h.branch)}</td>
+            <td className="num">{h.days_waiting}</td>
+            <td>{write && <div className="row" style={{ flexWrap: "nowrap" }}>
+              <button className="btn sm primary" onClick={() => { setStart(h); setF({ branch_id: h.branch_id || "" }); }}>{t.l("Boshlash", "Начать", "Start")}</button>
+              <button className="btn sm" onClick={() => setDismiss(h)}>{t.l("Olib tashlash", "Убрать", "Dismiss")}</button></div>}</td></tr>
+        ))}</tbody>
+      </table></div>
+      {start && <Modal title={`${t.l("Boshlash", "Начать", "Start")} · ${start.full_name}`} onClose={() => setStart(null)}>
+        <form className="form" onSubmit={async (e) => {
+          e.preventDefault();
+          try {
+            await api(`/api/onboarding/waiting/${start.id}/start`, { body: { mentor: f.mentor || null, start_date: f.start_date || null,
+              branch_id: f.branch_id ? Number(f.branch_id) : null, position_id: f.position_id ? Number(f.position_id) : null } });
+            done();
+          } catch (x: any) { setErr(x.message); }
+        }}>
+          <label className="field">{t("c_branch")}<select required value={f.branch_id || ""} onChange={(e) => setF({ ...f, branch_id: e.target.value })}>
+            <option value="">{t("c_choose")}</option>{dicts.branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select></label>
+          <label className="field">{t("c_position")}<select value={f.position_id || ""} onChange={(e) => setF({ ...f, position_id: e.target.value })}>
+            <option value="">{t.l("Vakansiyadan", "Из вакансии", "From the vacancy")}</option>{dicts.positions.map((p: any) => <option key={p.id} value={p.id}>{p.title}</option>)}</select></label>
+          <label className="field">{t("ob_mentor")}<input value={f.mentor || ""} onChange={(e) => setF({ ...f, mentor: e.target.value })} /></label>
+          <label className="field">{t("ob_startDate")}<input type="date" value={f.start_date || ""} onChange={(e) => setF({ ...f, start_date: e.target.value })} /></label>
+          <p className="muted small" style={{ margin: 0 }}>{t.l("Xodim kartasi (sinov muddati), 30/60/90 reja va onboarding kursi bitta bosishda yaratiladi.",
+            "Карточка сотрудника (испытательный срок), план 30/60/90 и курс создаются одним нажатием.", "The employee card (probation), the 30/60/90 plan and the course are created in one step.")}</p>
+          <button className="btn primary">{t.l("Boshlash", "Начать", "Start")}</button>
+        </form>
+      </Modal>}
+      {dismiss && <ReasonModal title={`${t.l("Olib tashlash", "Убрать", "Dismiss")} · ${dismiss.full_name}`} confirmLabel={t.l("Olib tashlash", "Убрать", "Dismiss")}
+        onClose={() => setDismiss(null)} onSubmit={async (reason: string) => { await api(`/api/onboarding/waiting/${dismiss.id}/dismiss`, { body: { reason } }); done(); }} />}
     </div>
   );
 }

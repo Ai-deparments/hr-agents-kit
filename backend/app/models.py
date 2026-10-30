@@ -742,3 +742,18 @@ class AgentJob(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime)
     applied_by: Mapped[str | None] = mapped_column(String(80))
+
+
+class OnboardingHandoff(Base):
+    """A candidate marked 'hired' in the panel / Mini App, waiting for HR to start the employee card + onboarding (one click).
+    (An offer accepted in the bot creates the card itself and needs no handoff.)"""
+    __tablename__ = "onboarding_handoffs"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    candidate_id: Mapped[int] = mapped_column(ForeignKey("candidates.id"), unique=True)
+    status: Mapped[str] = mapped_column(String(10), default="waiting")  # waiting | started | dismissed
+    employee_id: Mapped[int | None] = mapped_column(ForeignKey("employees.id"))
+    reason: Mapped[str | None] = mapped_column(String(300))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+    decided_by: Mapped[str | None] = mapped_column(String(80))
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime)
+    candidate: Mapped[Candidate] = relationship()

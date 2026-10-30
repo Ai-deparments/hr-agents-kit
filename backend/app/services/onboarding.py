@@ -86,7 +86,7 @@ def plans_in_scope(db: Session, scope: Scope) -> list[OnboardingPlan]:
 def status(db: Session, scope: Scope, today: date | None = None) -> dict:
     cards = [plan_card(p, today) for p in plans_in_scope(db, scope)]
     cards = [c for c in cards if c["day"] <= 120]
-    return {"total": len(cards), "behind": sum(c["light"] == "red" for c in cards),
+    return {"total": len(cards), "behind": sum(c["light"] == "red" for c in cards), "waiting": len(waiting(db, scope, today)),
             "no_mentor": sum(not c["mentor"] for c in cards),
             "no_test": sum(not c["scores"] for c in cards if c["day"] > 25),
             "plans": sorted(cards, key=lambda c: c["progress_pct"])}
@@ -125,3 +125,71 @@ def record_score(db: Session, scope: Scope, plan: OnboardingPlan, score: int, st
     plan.updated_at = datetime.now()
     audit(db, scope, "onboarding_score", f"plan:{plan.id}", stage=stage, score=score)
     return {"stage": stage, "score": score, "label": score_label(score)}
+
+
+# ---------------- hire -> onboarding handoff ----------------
+
+def _handoff_branch(h) -> int | None:
+    v = h.candidate.vacancy
+    return v.branch_id if v else None
+
+
+def waiting(db: Session, scope: Scope, today: date | None = None) -> list[dict]:
+    """Hired candidates without an employee card yet (oldest first)."""
+    from ..models import OnboardingHandoff
+    today = today or date.today()
+    out = []
+    for h in db.scalars(select(OnboardingHandoff).where(OnboardingHandoff.status == "waiting").order_by(OnboardingHandoff.id)):
+        c = h.candidate
+        if c.status != "hired" or not scope.allows_branch(_handoff_branch(h)):
+            continue
+        v = c.vacancy
+        out.append({"id": h.id, "candidate_id": c.id, "full_name": c.full_name, "phone": c.phone,
+                    "vacancy": v.title if v else None, "branch_id": v.branch_id if v else None,
+                    "branch": v.branch.name if v and v.branch else None, "position_code": v.position_code if v else None,
+                    "since": h.created_at.date().isoformat(), "days_waiting": (today - h.created_at.date()).days})
+    return out
+
+
+def start_from_handoff(db: Session, scope: Scope, h, mentor: str | None = None, start: date | None = None,
+                       branch_id: int | None = None, position_id: int | None = None) -> OnboardingPlan:
+    """One click, one transaction: employee card (probation) + 30/60/90 plan from the position template + the course."""
+    from ..models import Position
+    from . import onboarding_media
+    if scope.actor.startswith("agent:"):
+        raise NotAllowed("Only a person starts onboarding")
+    if h.status != "waiting" or h.candidate.status != "hired":
+        raise ValueError("Already handled")
+    c, v = h.candidate, h.candidate.vacancy
+    branch_id = branch_id or (v.branch_id if v else None)
+    if not branch_id:
+        raise ValueError("Choose the branch")
+    if not scope.allows_branch(branch_id) or not scope.allows_branch(_handoff_branch(h)):
+        raise NotAllowed("Not your branch")
+    if not position_id and v and v.position_code:
+        position_id = db.scalar(select(Position.id).where(Position.code == v.position_code))
+    tg = c.telegram_id if c.telegram_id and not db.scalar(select(Employee.id).where(Employee.telegram_id == c.telegram_id)) else None
+    emp = Employee(full_name=c.full_name, phone=c.phone, telegram_id=tg, branch_id=branch_id, position_id=position_id,
+                   hire_date=start or date.today(), status="probation", bot_functions=["helpdesk", "onboarding"] if tg else [])
+    db.add(emp)
+    db.flush()
+    db.refresh(emp)  # loads the position for the template choice
+    plan = create_plan(db, scope, emp, mentor, start)
+    onboarding_media.auto_assign(db, scope, emp)
+    h.status, h.employee_id, h.decided_by, h.decided_at = "started", emp.id, scope.actor, datetime.now()
+    audit(db, scope, "onboarding_handoff_start", f"candidate:{c.id}", employee_id=emp.id)
+    return plan
+
+
+def dismiss_handoff(db: Session, scope: Scope, h, reason: str):
+    if scope.actor.startswith("agent:"):
+        raise NotAllowed("Only a person dismisses")
+    if h.status != "waiting":
+        raise ValueError("Already handled")
+    if not scope.allows_branch(_handoff_branch(h)):
+        raise NotAllowed("Not your branch")
+    if len((reason or "").strip()) < 3:
+        raise ValueError("Reason is required")
+    h.status, h.reason, h.decided_by, h.decided_at = "dismissed", reason.strip()[:300], scope.actor, datetime.now()
+    audit(db, scope, "onboarding_handoff_dismiss", f"candidate:{h.candidate_id}", reason=h.reason)
+    return h

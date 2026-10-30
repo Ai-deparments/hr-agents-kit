@@ -86,13 +86,15 @@ def onboarding_md(db: Session, scope: Scope, today: date | None = None, evening:
                                                         MaterialSend.sent_at < _day(today)[0] - timedelta(days=2))))
     talks = list(db.scalars(select(MaterialSend).where(MaterialSend.talk_done.is_(False), MaterialSend.talk_at >= ta,
                                                        MaterialSend.talk_at < tb).order_by(MaterialSend.talk_at)))
+    from .onboarding import waiting as waiting_list
+    waiting = [] if evening else waiting_list(db, scope, today)  # hired, card + plan not started yet
     if evening and not (sent or viewed or talks):
         return None
-    if not (newbies or sent or unseen or talks):
+    if not (newbies or sent or unseen or talks or waiting):
         return None
     title = {m.id: m.title for m in db.scalars(select(OnboardingMaterial))}
     when, tday = ("bugun", "Ertangi") if evening else ("kecha", "Bugungi")
-    lines = ([] if evening else [f"Sinov muddatidagi xodim: **{len(newbies)}**"]) + [
+    lines = ([] if evening else [f"Sinov muddatidagi xodim: **{len(newbies)}**", f"Ishga olingan, boshlash kutilmoqda: **{len(waiting)}**"]) + [
         f"Yuborilgan material ({when}): **{len(sent)}**", f"Ko'rildi ({when}): **{len(viewed)}**"]
     lines += ([] if evening else [f"2+ kun ko'rilmagan: **{len(unseen)}**"]) + [f"{tday} suhbat: **{len(talks)}**"]
     out = [f"## {E('moon' if evening else 'target')} Onboarding — {today:%d.%m}, {'kech' if evening else 'ertalab'}", _li(lines)]
@@ -103,6 +105,9 @@ def onboarding_md(db: Session, scope: Scope, today: date | None = None, evening:
     if unseen and not evening:
         per = Counter(s.employee.full_name for s in unseen)
         out += [f"### {E('eyes')} Ko'rmaganlar", _li([f"{M(n)} — {k} ta material" for n, k in per.most_common()], 8)]
+    if waiting:  # count only in the group; names are in the panel (Onboarding -> waiting)
+        oldest = max(w["days_waiting"] for w in waiting)
+        out += [f"#### {E('clock')} *{len(waiting)} ta ishga olingan nomzod kartasi ochilmagan (eng uzoq: {oldest} kun) — panelda boshlang.*"]
     if newbies and not evening:
         out += [f"### {E('user')} Yangi xodimlar", _li([
             f"{M(e.full_name)} — {M(e.position.title) if e.position else '—'}"

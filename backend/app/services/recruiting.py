@@ -134,6 +134,11 @@ def set_status(db: Session, scope: Scope, cand: Candidate, status: str) -> Candi
     cand.status = status
     if status in ("hired", "rejected"):
         cand.decided_at = datetime.now()
+    if status == "hired":  # appears in Onboarding as "waiting"; HR starts the card + plan with one click
+        from ..models import Employee, OnboardingHandoff
+        linked = cand.telegram_id and db.scalar(select(Employee.id).where(Employee.telegram_id == cand.telegram_id))
+        if not linked and not db.scalar(select(OnboardingHandoff.id).where(OnboardingHandoff.candidate_id == cand.id)):
+            db.add(OnboardingHandoff(candidate_id=cand.id))
     audit(db, scope, "candidate_status", f"candidate:{cand.id}", status=status)
     return cand
 

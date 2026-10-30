@@ -16,7 +16,7 @@ from ..auth import check_password, current_user, make_token, panel_scope, requir
 from ..config import cfg
 from ..db import get_db
 from ..models import (ApprovalRequest, AuditLog, Branch, BranchLead, Candidate, ChatMessage, Department, Document, Employee,
-                      HrOverride, OnboardingPlan, PayrollEntry, Position, Region, Registration, SalesRecord, Sop, User, Vacancy)
+                      HrOverride, OnboardingHandoff, OnboardingPlan, PayrollEntry, Position, Region, Registration, SalesRecord, Sop, User, Vacancy)
 from ..rbac import Scope, audit
 from ..services import analytics, attendance, onboarding, payroll, people, recruiting, reports
 
@@ -501,6 +501,39 @@ def onboarding_create(body: OnbIn, scope: Scope = Depends(require("onboarding"))
     plan = _guard(onboarding.create_plan, db, scope, e, body.mentor, body.start_date)
     db.commit()
     return onboarding.plan_card(plan)
+
+
+@router.get("/onboarding/waiting")
+def onboarding_waiting(scope: Scope = Depends(require("hr.read")), db: Session = Depends(get_db)):
+    """Hired candidates waiting for the employee card + onboarding plan."""
+    return onboarding.waiting(db, scope)
+
+
+class HandoffIn(BaseModel):
+    mentor: str | None = Field(default=None, max_length=160)
+    start_date: date | None = None
+    branch_id: int | None = None
+    position_id: int | None = None
+
+
+@router.post("/onboarding/waiting/{hid}/start")
+def onboarding_waiting_start(hid: int, body: HandoffIn, scope: Scope = Depends(require("onboarding")), db: Session = Depends(get_db)):
+    h = db.get(OnboardingHandoff, hid)
+    if not h:
+        raise HTTPException(404, "Not found")
+    plan = _guard(onboarding.start_from_handoff, db, scope, h, body.mentor, body.start_date, body.branch_id, body.position_id)
+    db.commit()
+    return onboarding.plan_card(plan)
+
+
+@router.post("/onboarding/waiting/{hid}/dismiss")
+def onboarding_waiting_dismiss(hid: int, body: ReasonIn, scope: Scope = Depends(require("onboarding")), db: Session = Depends(get_db)):
+    h = db.get(OnboardingHandoff, hid)
+    if not h:
+        raise HTTPException(404, "Not found")
+    _guard(onboarding.dismiss_handoff, db, scope, h, body.reason)
+    db.commit()
+    return {"id": h.id, "status": h.status}
 
 
 @router.post("/onboarding/items/{item_id}")
