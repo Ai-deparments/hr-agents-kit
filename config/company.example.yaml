@@ -148,6 +148,10 @@ recruiting:
   # In the bot a vacancy is published only when HR's whole message IS one of these words (optionally + vacancy number);
   # "e'lon qilma" / "не опубликуй" never publish
   publish_confirm_words: ["e'lon qil", "chop et", "опубликуй", "публикуй", "publish"]
+  interviews:
+    language: uz                  # uz | ru | en — fixed texts the candidate gets (invite, reject, booking, reminders)
+    remind_day_before_at: "18:00" # reminder the day before (skipped if the slot was booked after this time)
+    remind_minutes_before: 60     # and this many minutes before
 
 ads:
   budget_min: 10000

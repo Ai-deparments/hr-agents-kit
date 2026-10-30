@@ -477,7 +477,10 @@ class InterviewSlot(Base):
     interviewer: Mapped[str] = mapped_column(String(160), default="")
     candidate_id: Mapped[int | None] = mapped_column(ForeignKey("candidates.id"))
     status: Mapped[str] = mapped_column(String(10), default="free")   # free | booked | done | cancelled
-    reminded: Mapped[bool] = mapped_column(Boolean, default=False)
+    reminded: Mapped[bool] = mapped_column(Boolean, default=False)    # legacy (v0.3 single reminder)
+    reminded_day: Mapped[bool] = mapped_column(Boolean, default=False)   # day before, at recruiting.interviews.remind_day_before_at
+    reminded_hour: Mapped[bool] = mapped_column(Boolean, default=False)  # N minutes before
+    booked_at: Mapped[datetime | None] = mapped_column(DateTime)
     created_by: Mapped[str] = mapped_column(String(80), default="")
 
 
@@ -607,6 +610,8 @@ class Outbox(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
     sent_at: Mapped[datetime | None] = mapped_column(DateTime)
     error: Mapped[str | None] = mapped_column(String(300))
+    claimed_at: Mapped[datetime | None] = mapped_column(DateTime)  # taken by the bot: never sent a second time
+    dedupe_key: Mapped[str | None] = mapped_column(String(80), index=True)  # same decision twice -> one message
 
 
 class ChatMessage(Base):

@@ -64,12 +64,46 @@ function AddSlots({ onClose, onDone }: { onClose: () => void; onDone: () => void
   );
 }
 
+/** Invite / Reject: HR sees the exact message the candidate will get; it is sent once, only after "Send". */
+export function DecisionPreview({ cand, action, onClose, onDone }: { cand: any; action: "invite" | "reject"; onClose: () => void; onDone: () => void }) {
+  const t = useT();
+  const p = useLoad<any>(`/api/candidates/${cand.id}/preview?action=${action}`);
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const title = action === "invite" ? t.l("Suhbatga taklif", "Приглашение на собеседование", "Invite to interview") : t.l("Rad etish", "Отказ", "Reject");
+  const canSend = action === "reject" || (p.data?.telegram && p.data?.text);
+  return (
+    <Modal title={`${title} · ${cand.full_name}`} onClose={onClose}>
+      <div className="stack">
+        <Err e={p.error || err} />
+        {p.data && !p.data.telegram && <div className="note">{action === "reject"
+          ? t.l("Telegram yo'q — holat o'zgaradi, xabar yuborilmaydi.", "Нет Telegram — статус изменится, сообщение не уйдёт.", "No Telegram — the status changes, no message is sent.")
+          : t.l("Nomzodning Telegram'i yo'q — bot orqali yuborib bo'lmaydi.", "У кандидата нет Telegram — через бота не отправить.", "No Telegram — can't send via the bot.")}</div>}
+        {p.data && action === "invite" && !p.data.text && <div className="note">{t.l("Bo'sh vaqt yo'q — avval suhbat vaqtlarini qo'shing.", "Нет свободных слотов — сначала добавьте время.", "No free slots — add interview times first.")}</div>}
+        {p.data?.text && p.data.telegram && <>
+          <div className="muted small">{t.l("Nomzod aynan shu xabarni oladi:", "Кандидат получит ровно это сообщение:", "The candidate gets exactly this message:")}</div>
+          <pre className="ad-preview">{p.data.text}</pre>
+        </>}
+        <div className="row"><span className="spacer" />
+          <button className="btn" onClick={onClose}>{t("cancel")}</button>
+          <button className={`btn ${action === "reject" ? "danger" : "primary"}`} disabled={!p.data || !canSend || busy} onClick={async () => {
+            setBusy(true); setErr(null);
+            try { await api(`/api/candidates/${cand.id}/${action}`, { body: { expected_text: p.data.text } }); onDone(); onClose(); }
+            catch (x: any) { setErr(x.message); p.reload(); } finally { setBusy(false); }
+          }}>{action === "reject" ? t.l("Rad etish", "Отказать", "Reject") : t.l("Yuborish", "Отправить", "Send")}</button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 /** Inside the candidate card: interview invite (slots in the bot) and job offer (accepted in words). */
 export function CandidateHiring({ cand, write, onChanged }: { cand: any; write: boolean; onChanged: () => void }) {
   const t = useT();
   const { dicts } = usePanel();
   const st = useLoad<any>(`/api/candidates/${cand.id}/steps`);
   const [offer, setOffer] = useState(false);
+  const [inviting, setInviting] = useState(false);
   const [f, setF] = useState<any>({ position_id: "", branch_id: "", salary_text: "", start_date: "", note: "" });
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -90,10 +124,7 @@ export function CandidateHiring({ cand, write, onChanged }: { cand: any; write: 
       {msg && <div className="note">{msg}</div>}
       <Err e={err} />
       {write && d.telegram && cand.status !== "hired" && !offer && <div className="row">
-        <button className="btn" onClick={async () => {
-          try { const r = await api<any>(`/api/candidates/${cand.id}/invite`, { body: {} }); setMsg(t.l(`Yuborildi: ${r.offered} ta vaqt`, `Отправлено: ${r.offered} слотов`, `Sent ${r.offered} slots`)); st.reload(); }
-          catch (x: any) { setErr(x.message); }
-        }}>🗓 {t.l("Suhbatga taklif", "Пригласить на собеседование", "Invite to interview")}</button>
+        <button className="btn" onClick={() => setInviting(true)}>🗓 {t.l("Suhbatga taklif", "Пригласить на собеседование", "Invite to interview")}</button>
         <button className="btn primary" onClick={() => setOffer(true)}>📄 {t.l("Ish taklifi", "Отправить оффер", "Send offer")}</button>
       </div>}
       {offer && <form className="form" onSubmit={async (e) => {
@@ -115,6 +146,8 @@ export function CandidateHiring({ cand, write, onChanged }: { cand: any; write: 
         <div className="row"><button type="button" className="btn" onClick={() => setOffer(false)}>{t("cancel")}</button>
           <button className="btn primary">{t.l("Yuborish", "Отправить", "Send")}</button></div>
       </form>}
+      {inviting && <DecisionPreview cand={cand} action="invite" onClose={() => setInviting(false)}
+        onDone={() => { setMsg(t.l("Taklif yuborildi.", "Приглашение отправлено.", "Invite sent.")); st.reload(); }} />}
     </div>
   );
 }

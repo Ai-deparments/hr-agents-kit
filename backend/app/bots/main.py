@@ -800,12 +800,13 @@ async def registration_step(m: Message, value: str | None = None, user=None) -> 
 
 
 async def send_outbox(sender: Sender) -> None:
-    """Deliver messages queued by the panel (registration decisions, broadcasts, onboarding)."""
-    from ..models import Outbox
+    """Deliver messages queued by the panel (registration decisions, broadcasts, onboarding, candidates).
+    Each row is claimed (committed) before sending, so a crash or a second worker never sends it twice."""
+    from ..services import outbox
     b = sender.bot()
     with SessionLocal() as db:
-        rows = list(db.scalars(select(Outbox).where(Outbox.sent_at.is_(None), Outbox.error.is_(None)).order_by(Outbox.id).limit(25)))
-        for o in rows:
+        for o in outbox.claim(db, 25):
+            ok, err = False, None
             try:
                 if o.file_path:
                     from aiogram.types import FSInputFile
@@ -818,11 +819,11 @@ async def send_outbox(sender: Sender) -> None:
                     from ..services import topics
                     thread = topics.thread_for(db, o.topic) if o.topic else None
                     await b.send_message(o.telegram_id, _esc(o.text), message_thread_id=thread)
-                o.sent_at = datetime.now()
+                ok = True
             except Exception as e:
-                o.error = str(e)[:300]
+                err = str(e)
+            outbox.finish(db, o, ok, err)
             await asyncio.sleep(0.05)  # stay under Telegram's 30 msg/s
-        db.commit()
 
 
 # ---------------- scheduled reports & notifications ----------------
@@ -993,13 +994,13 @@ async def send_talk_reminders(sender: Sender) -> None:
 
 
 def _candidate_answer(tg_id: int, text: str) -> str | None:
-    """Open hiring step (slot choice / offer) for this Telegram user -> handle; None when there is none."""
+    """Hiring conversation (slot choice, a booked interview to move / cancel, an offer) -> reply; None when there is none."""
     from ..services import hiring
     with SessionLocal() as db:
-        step = hiring.open_step(db, tg_id)
-        if not step:
+        res = hiring.handle(db, tg_id, text)
+        if res is None:
             return None
-        reply, notes = hiring.answer(db, step, text)
+        reply, notes = res
         from ..models import Outbox
         group = settings().report_chat_id
         if group:  # hiring events go to the recruiter topic of the HR group, once
@@ -1013,11 +1014,11 @@ def _candidate_answer(tg_id: int, text: str) -> str | None:
 
 
 def interview_reminders() -> None:
-    from ..models import Outbox
-    from ..services import hiring
+    """Day before at 18:00 and 1 h before (each at most once: slot flags + outbox dedupe)."""
+    from ..services import hiring, outbox
     with SessionLocal() as db:
         for tg, text in hiring.remind(db):
-            db.add(Outbox(telegram_id=tg, text=text))
+            outbox.queue(db, tg, text, dedupe=outbox.key("remind", tg, text))
         db.commit()
 
 
@@ -1078,7 +1079,7 @@ async def main() -> None:
     sched.add_job(send_outbox, "interval", seconds=10, args=[sender], max_instances=1)
     sched.add_job(send_talk_reminders, "cron", hour=8, minute=30, args=[sender])
     sched.add_job(deliver_onboarding, "cron", hour=9, minute=30)
-    sched.add_job(interview_reminders, "interval", minutes=10)
+    sched.add_job(interview_reminders, "interval", minutes=5, max_instances=1)
     sched.add_job(run_agent_jobs, "interval", minutes=1, max_instances=1)
     sched.start()
 

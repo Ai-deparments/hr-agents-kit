@@ -34,7 +34,8 @@ def test_full_hiring_flow(db):
     booked = db.scalar(select(InterviewSlot).where(InterviewSlot.candidate_id == cand.id))
     db.refresh(booked)
     assert booked.status == "booked"
-    assert bot._candidate_answer(888001, "salom") is None              # no open step left
+    assert bot._candidate_answer(888001, "salom").startswith("✅ Suhbat")  # booked: the booking is repeated, not re-offered
+    assert bot._candidate_answer(888002, "salom") is None              # not a candidate: not a hiring conversation
     pos = c.get("/api/dictionaries", headers=hr).json()["positions"][0]["id"]
     r = c.post(f"/api/candidates/{cand.id}/offer", headers=hr, json={"position_id": pos, "salary_text": "6 000 000 so'm",
                                                                    "start_date": tomorrow}).json()

@@ -42,21 +42,8 @@ RULES = (
 
 
 def _llm(system: str, prompt: str, schema: dict | None = None) -> dict | None:
-    schema = schema or SCHEMA
-    if os.getenv("LLM_MODE") == "claude_cli":
-        from ..agents import claude_cli
-        if claude_cli.enabled():
-            return claude_cli.ask(system, prompt, schema, timeout=120)
-    from ..agents.runtime import llm_enabled
-    if llm_enabled() and os.getenv("LLM_MODE") != "claude_cli":
-        import anthropic
-        from ..config import settings
-        r = anthropic.Anthropic().messages.create(
-            model=settings().claude_model, max_tokens=2000, system=system,
-            output_config={"effort": "low", "format": {"type": "json_schema", "schema": schema}},
-            messages=[{"role": "user", "content": prompt}])
-        return json.loads(next(b.text for b in r.content if b.type == "text"))
-    return None
+    from .llm import ask_json
+    return ask_json(system, prompt, schema or SCHEMA)
 
 
 def _clean_fields(data: dict) -> dict:

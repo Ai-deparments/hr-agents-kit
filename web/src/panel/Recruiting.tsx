@@ -3,7 +3,7 @@ import { api, dash } from "../api";
 import { tEnum, useT } from "../i18n";
 import { Empty, Err, Light, Modal, Status, useLoad } from "../ui";
 import { can, usePanel } from "./ctx";
-import { CandidateHiring, SlotsCard } from "./Hiring";
+import { CandidateHiring, DecisionPreview, SlotsCard } from "./Hiring";
 import { CompanyFacts, NewVacancy, VacancyEditor } from "./VacancyEditor";
 
 const CRIT: Record<string, string> = { role_fit: "crit_role_fit", specifics: "crit_specifics", communication: "crit_communication", motivation: "crit_motivation" };
@@ -20,6 +20,7 @@ export default function Recruiting() {
   const [filter, setFilter] = useState("active");
   const [preview, setPreview] = useState<any | null>(null);
   const [cand, setCand] = useState<any | null>(null);
+  const [rejecting, setRejecting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const write = can(me, "recruiting");
   const setStatus = async (id: number, status: string) => {
@@ -88,11 +89,13 @@ export default function Recruiting() {
           {write && <div className="row">
             <button className="btn" onClick={() => setStatus(cand.id, "shortlist")}>{t("rc_shortlistBtn")}</button>
             <button className="btn primary" onClick={() => setStatus(cand.id, "hired")}>{t("rc_hiredBtn")}</button>
-            <button className="btn danger" onClick={() => setStatus(cand.id, "rejected")}>{t("reject")}</button>
+            {cand.status !== "rejected" && <button className="btn danger" onClick={() => setRejecting(true)}>{t("reject")}</button>}
           </div>}
           <CandidateHiring cand={cand} write={write} onChanged={cands.reload} />
         </div>
       </Modal>}
+      {cand && rejecting && <DecisionPreview cand={cand} action="reject" onClose={() => setRejecting(false)}
+        onDone={() => { cands.reload(); setCand(null); }} />}
       {drafting && <DraftVacancy onClose={() => setDrafting(false)} onDone={vac.reload} />}
       {aiNew && <NewVacancy onClose={() => setAiNew(false)} onOpen={(x) => { setAiNew(false); vac.reload(); setEditId(x.id); }} />}
       {editId && <VacancyEditor id={editId} onClose={() => setEditId(null)} onChanged={vac.reload} />}

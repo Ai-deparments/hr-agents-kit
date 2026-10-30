@@ -87,6 +87,9 @@ def slot_cancel(sid: int, scope: Scope = Depends(require("recruiting")), db: Ses
         if c and c.telegram_id:
             from ..models import Outbox
             db.add(Outbox(telegram_id=c.telegram_id, text=f"Suhbat ({s.starts_at:%d.%m %H:%M}) bekor qilindi. HR siz bilan bog'lanadi."))
+        for st in db.scalars(select(CandidateStep).where(CandidateStep.candidate_id == s.candidate_id, CandidateStep.kind == "slots",
+                                                         CandidateStep.status == "open")):
+            st.status = "cancelled"  # a pending "move my interview" offer dies with the slot
     s.status = "cancelled"
     audit(db, scope, "slot_cancel", f"slot:{s.id}")
     db.commit()
@@ -100,16 +103,42 @@ def _cand(db: Session, scope: Scope, cid: int) -> Candidate:
     return c
 
 
+@router.get("/candidates/{cid}/preview")
+def preview(cid: int, action: str, scope: Scope = Depends(require("recruiting")), db: Session = Depends(get_db)):
+    """The exact message the candidate would get for Invite / Reject. Nothing is saved or sent."""
+    try:
+        return hiring.preview(db, scope, _cand(db, scope, cid), action)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
 class InviteIn(BaseModel):
-    slot_ids: list[int] = []
+    slot_ids: list[int] = Field(default=[], max_length=50)
+    expected_text: str | None = Field(default=None, max_length=4000)  # the previewed message; must still be exact
 
 
 @router.post("/candidates/{cid}/invite")
 def invite(cid: int, body: InviteIn, scope: Scope = Depends(require("recruiting")), db: Session = Depends(get_db)):
     try:
-        out = hiring.invite(db, scope, _cand(db, scope, cid), body.slot_ids or None)
+        out = hiring.invite(db, scope, _cand(db, scope, cid), body.slot_ids or None, body.expected_text)
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(409 if "o'zgardi" in str(e) else 400, str(e))
+    db.commit()
+    return out
+
+
+class RejectIn(BaseModel):
+    expected_text: str | None = Field(default=None, max_length=4000)
+
+
+@router.post("/candidates/{cid}/reject")
+def reject(cid: int, body: RejectIn, scope: Scope = Depends(require("recruiting")), db: Session = Depends(get_db)):
+    try:
+        out = hiring.reject(db, scope, _cand(db, scope, cid), body.expected_text)
+    except PermissionError as e:
+        raise HTTPException(403, str(e))
+    except ValueError as e:
+        raise HTTPException(409 if "changed" in str(e) else 400, str(e))
     db.commit()
     return out
 
