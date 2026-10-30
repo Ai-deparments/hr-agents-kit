@@ -22,6 +22,7 @@ import Kpi from "./Kpi";
 import HhSearch from "./HhSearch";
 import Materials from "./Materials";
 import Camera from "./Camera";
+import Discipline from "./Discipline";
 import { BotAccess, PendingUsers, UsersPage } from "./Users";
 import { Ic } from "../icons";
 
@@ -40,6 +41,7 @@ const PAGES: Page[] = [
   { key: "approvals", sec: "secPeople", icon: "check", perm: "hr.read", el: () => <Approvals /> },
   { key: "documents", sec: "secPeople", icon: "folder", perm: "hr.read", el: () => <Documents /> },
   { key: "kpi", sec: "secMoney", icon: "chart", perm: "hr.read", el: () => <Kpi /> },
+  { key: "discipline", sec: "secMoney", icon: "shield", perm: "hr.read", el: () => <Discipline /> },
   { key: "payroll", sec: "secMoney", icon: "wallet", perm: "hr.read", el: () => <Payroll /> },
   { key: "onboarding", sec: "secGrowth", icon: "flag", perm: "hr.read", el: () => <Onboarding /> },
   { key: "materials", sec: "secGrowth", icon: "book", perm: "hr.read", el: () => <Materials /> },

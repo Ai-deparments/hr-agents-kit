@@ -76,6 +76,15 @@ labor:                        # Labor Code of Uzbekistan (ZRU-798) — confirm w
   overtime_rate: null
   night_rate: null
 
+discipline:                   # the rule LIST lives here; admins edit texts and amounts in Panel -> Discipline
+  nudge_min_late_days: 2      # Monday reminder drafts: people late on at least this many days last week
+  # window: month (count cases this month) | all_time (since starts_on) | per_case (no counting: every case is a fine)
+  # amounts are in the smallest currency unit; a recorded fine keeps its amount even if the rule changes later
+  rules:
+    - { code: late,          title: "Lateness",               window: month,    warnings_before_fine: 2, fine_amount: 50000,  extra_amount: 0 }
+    - { code: no_show,       title: "Absence without notice", window: all_time, warnings_before_fine: 1, fine_amount: 200000, extra_amount: 0 }
+    - { code: cash_shortage, title: "Cash desk discrepancy",  window: per_case, warnings_before_fine: 0, fine_amount: 100000, extra_amount: 0 }
+
 cabinet:
   heads_see_salary: false     # may a pharmacy head see the salaries of their team in the Mini App?
 

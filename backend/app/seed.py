@@ -16,7 +16,7 @@ from .config import cfg
 from .db import SessionLocal, init_db
 from .models import (AttendanceEvent, Branch, BranchLead, Candidate, Department, Document, Employee, KpiMetric, KpiValue,
                      LeadReport, LeaveRequest, OnboardingPlan, PayrollEntry, Position, Region, Registration, SalesRecord, Sop, User, Vacancy)
-from .services import onboarding, recruiting, schedules
+from .services import discipline, onboarding, recruiting, schedules
 from .rbac import Scope, seed_roles
 
 FIRST = ["Dilnoza", "Aziza", "Jasur", "Sardor", "Malika", "Nodira", "Bekzod", "Kamola", "Otabek", "Shahnoza", "Ulugbek",
@@ -39,6 +39,7 @@ def load_dictionaries(db: Session) -> None:
     for p in cfg("positions", []):
         if not db.scalar(select(Position).where(Position.code == p["code"])):
             db.add(Position(code=p["code"], title=p["title"], is_manager=bool(p.get("is_manager"))))
+    discipline.sync_from_config(db)  # new rules from company.yaml; panel edits of existing rules are kept
     db.flush()
 
 

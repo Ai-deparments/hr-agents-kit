@@ -667,3 +667,41 @@ class CameraVisit(Base):
     hour: Mapped[int] = mapped_column(Integer)
     branch_code: Mapped[str | None] = mapped_column(String(20))
     count: Mapped[int] = mapped_column(Integer, default=0)
+
+
+# ---------------- discipline rules (warnings -> fines) ----------------
+
+class DisciplineRule(Base):
+    """The rule list comes from company.yaml (seed); admins edit texts and numbers in the panel, never add or delete."""
+    __tablename__ = "discipline_rules"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(40), unique=True)
+    title: Mapped[str] = mapped_column(String(160))
+    text: Mapped[str] = mapped_column(Text, default="")
+    window: Mapped[str] = mapped_column(String(10), default="month")  # month | all_time | per_case
+    warnings_before_fine: Mapped[int] = mapped_column(Integer, default=0)
+    fine_amount: Mapped[int] = mapped_column(Integer, default=0)       # smallest currency unit
+    extra_amount: Mapped[int] = mapped_column(Integer, default=0)      # tax / extra charge added to the fine
+    note: Mapped[str] = mapped_column(String(300), default="")
+    starts_on: Mapped[date | None] = mapped_column(Date)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+    updated_by: Mapped[str | None] = mapped_column(String(80))
+
+
+class DisciplineCase(Base):
+    """One applied rule. Amounts are a snapshot: editing the rule later never changes a recorded fine."""
+    __tablename__ = "discipline_cases"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    employee_id: Mapped[int] = mapped_column(ForeignKey("employees.id"), index=True)
+    rule_id: Mapped[int] = mapped_column(ForeignKey("discipline_rules.id"), index=True)
+    month: Mapped[str] = mapped_column(String(7), index=True)
+    outcome: Mapped[str] = mapped_column(String(10))  # warning | fine
+    prior_count: Mapped[int] = mapped_column(Integer, default=0)
+    fine_amount: Mapped[int] = mapped_column(Integer, default=0)
+    extra_amount: Mapped[int] = mapped_column(Integer, default=0)
+    entry_id: Mapped[int] = mapped_column(ForeignKey("payroll_entries.id"))
+    reason: Mapped[str] = mapped_column(String(300))
+    author: Mapped[str] = mapped_column(String(80))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+    rule: Mapped[DisciplineRule] = relationship()
+    employee: Mapped[Employee] = relationship()

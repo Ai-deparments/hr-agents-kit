@@ -122,6 +122,15 @@ def _discipline(ctx: Ctx, month: str | None = None, limit: int = 15):
             "note": "not marked ≠ absent; a lead or HR confirms the reason"}
 
 
+@tool("discipline_rules", "Company discipline rules: warnings before a fine, fine amount, counting window. Read only — "
+      "a person applies a rule in the panel (a fine is a human-only deduction).")
+def _discipline_rules(ctx: Ctx):
+    from ..models import DisciplineRule
+    from ..services import discipline
+    return [{k: v for k, v in discipline.rule_dict(r).items() if k != "updated_by"}
+            for r in ctx.db.scalars(select(DisciplineRule).order_by(DisciplineRule.id))]
+
+
 @tool("employee_month", "One employee's attendance for a month: each day's status, check-in/out, hours, lateness.",
       {"employee_id": I, "month": {**S, "description": "YYYY-MM"}}, required=["employee_id"])
 def _employee_month(ctx: Ctx, employee_id: int, month: str | None = None):
