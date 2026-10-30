@@ -24,8 +24,12 @@ NOTICE_RE = re.compile(r"So'rov #(\d{1,9})")
 # "so'rov 12 ...", "заявка №12 ...", "#12 ..." at the start of the message
 CMD_RE = re.compile(r"^\s*(?:(?:so['ʻ’`]?rov|заявк[аиу]?)\s*[#№]?\s*|#)(\d{1,9})\b", re.I)
 _W = r"(?<![\w'ʻ’])({})(?![\w'ʻ’])"
-APPROVE_RE = re.compile(_W.format(r"tasdiq\w*|ha|ok|ок|одобр\w*|согласов\w*|да"), re.I)
-REJECT_RE = re.compile(_W.format(r"rad\w*|yo['ʻ’]?q|отказ\w*|нет"), re.I)
+# a decision must START the message ("tasdiqlayman", "rad: sabab"); a word somewhere inside ("bilmayman, ok keyin")
+# is not a decision. Short words count only as the whole message.
+APPROVE_RE = re.compile(r"\s*(tasdiq\w*|одобр\w*|согласов\w*|approve\w*)(?![\w'ʻ’])", re.I)
+REJECT_RE = re.compile(r"\s*(rad\w*|отказ\w*|reject\w*)(?![\w'ʻ’])", re.I)
+SHORT_YES = re.compile(r"\s*(ha|ok|ок|да|xo['ʻ’]?p)[\s.!]*$", re.I)
+SHORT_NO = re.compile(r"\s*(yo['ʻ’]?q|нет)(?![\w'ʻ’])", re.I)
 
 
 def docs_dir() -> Path:
@@ -73,11 +77,11 @@ def parse(text: str, replied: str = "") -> tuple[int, bool, str] | None:
         if not c:
             return None
         rid, body = int(c.group(1)), text[c.end():]
-    a, r = APPROVE_RE.search(body), REJECT_RE.search(body)
+    a = APPROVE_RE.match(body) or SHORT_YES.match(body)
+    r = None if a else (REJECT_RE.match(body) or SHORT_NO.match(body))
     if not a and not r:
         return None
-    approve = bool(a and (not r or a.start() < r.start()))
-    hit = a if approve else r
+    approve, hit = bool(a), a or r
     rest = body[hit.end():]
     reason = rest.split(":", 1)[1] if ":" in rest else rest
     return rid, approve, reason.strip(" .,-—")[:300]

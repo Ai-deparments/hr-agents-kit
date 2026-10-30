@@ -99,3 +99,14 @@ def test_reject_with_reason(db, emp):
     assert "rad etildi" in o.text and "smenada odam yetmaydi" in o.text
     again = requests_flow.handle(db, scope_for_telegram(db, HR_TG), f"#{r.id} tasdiqlayman")
     assert again["error"] == "Already decided"
+
+
+def test_decision_must_start_the_message():
+    from app.services.requests_flow import parse
+    n = "So'rov #12"
+    assert parse("tasdiqlayman", n) == (12, True, "")
+    assert parse("ok", n) == (12, True, "")
+    assert parse("rad: hujjat yo'q", n) == (12, False, "hujjat yo'q")
+    assert parse("bilmayman, ok keyin qarayman", n) is None          # "ok" inside a sentence is not an approval
+    assert parse("hali emas, ertaga tasdiqlayman", n) is None
+    assert parse("ha lekin keyin", n) is None

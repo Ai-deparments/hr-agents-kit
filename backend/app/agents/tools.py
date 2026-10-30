@@ -643,9 +643,10 @@ def _onb_today(ctx: Ctx):
     unseen = ctx.db.scalars(select(MaterialSend).where(MaterialSend.queued.is_(True), MaterialSend.viewed_at.is_(None),
                                                        MaterialSend.sent_at < a - timedelta(days=2)))
     probation = ctx.db.scalars(select(Employee).where(Employee.status == "probation"))
+    mine = lambda e: not e.branch_id or ctx.scope.allows_branch(e.branch_id)  # noqa: E731
     return {"talks_today": [{"at": t.talk_at.strftime("%H:%M"), "employee": t.employee.full_name, "with": t.talk_with,
-                             "material": title.get(t.material_id)} for t in talks],
+                             "material": title.get(t.material_id)} for t in talks if mine(t.employee)],
             "not_viewed_2d": [{"employee": s.employee.full_name, "material": title.get(s.material_id),
-                               "sent": s.sent_at.strftime("%d.%m")} for s in unseen],
+                               "sent": s.sent_at.strftime("%d.%m")} for s in unseen if mine(s.employee)],
             "on_probation": [e.full_name for e in probation if not e.branch_id or ctx.scope.allows_branch(e.branch_id)],
             "library_size": len(title)}
