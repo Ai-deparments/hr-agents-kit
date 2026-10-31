@@ -15,6 +15,20 @@ import httpx
 API = "https://api.hh.ru"
 AREAS = {"uz": 97, "tashkent": 2759, "samarkand": 2760, "bukhara": 2761, "andijan": 2762, "fergana": 2764, "namangan": 2765}
 EXPERIENCE = {"noExperience", "between1And3", "between3And6", "moreThan6"}
+# "N+" years = every hh bucket from N up (hh takes the experience param several times)
+EXPERIENCE_MIN = {"1+": ["between1And3", "between3And6", "moreThan6"], "3+": ["between3And6", "moreThan6"],
+                  "6+": ["moreThan6"]}
+
+
+def experience_values(experience: str) -> list[str]:
+    """'1+' / 'between1And3' / 'between1And3,between3And6' -> hh experience values."""
+    e = (experience or "").strip()
+    if e in EXPERIENCE_MIN:
+        return EXPERIENCE_MIN[e]
+    vals = [x.strip() for x in e.split(",") if x.strip()]
+    if any(v not in EXPERIENCE for v in vals):
+        raise HhError("Bad experience")
+    return vals
 
 
 class HhError(Exception):
@@ -58,20 +72,19 @@ def _ua() -> str:
 def search(text: str, area: str = "uz", experience: str = "", salary_to: int | None = None, page: int = 0) -> dict:
     if not text.strip() or len(text) > 200:
         raise HhError("Qidiruv so'zi 1–200 belgi · Запрос 1–200 символов")
-    if experience and experience not in EXPERIENCE:
-        raise HhError("Bad experience")
+    exp = experience_values(experience)
+    if area not in AREAS:
+        raise HhError(f"area: {', '.join(AREAS)}")
     if demo():
         return _demo(text, area)
     st = status()
     if not st["ok"]:
         raise HhError(st["detail"])
     tok = json.loads(_token_file().read_text())["access_token"]
-    params = {"text": text, "area": AREAS.get(area, AREAS["uz"]), "per_page": 20, "page": max(0, min(page, 19)),
-              "order_by": "relevance", "host": "hh.uz"}
-    if experience:
-        params["experience"] = experience
+    params = [("text", text), ("area", AREAS[area]), ("per_page", 20), ("page", max(0, min(page, 19))),
+              ("order_by", "relevance"), ("host", "hh.uz")] + [("experience", x) for x in exp]
     if salary_to:
-        params["salary_to"], params["currency"] = salary_to, "UZS"
+        params += [("salary_to", salary_to), ("currency", "UZS")]
     try:
         r = httpx.get(f"{API}/resumes", params=params, timeout=30,
                       headers={"Authorization": f"Bearer {tok}", "HH-User-Agent": _ua(), "User-Agent": _ua()})

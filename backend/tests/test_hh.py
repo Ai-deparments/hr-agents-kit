@@ -44,3 +44,30 @@ def test_demo_turns_off_when_token_appears(monkeypatch, tmp_path):
     assert hh.demo()
     f.write_text('{"access_token": "x", "expires_at": 9999999999}')
     assert not hh.demo() and hh.status()["mode"] == "live"
+
+
+def test_live_search_sends_area_and_experience_range(monkeypatch, tmp_path):
+    import pytest
+    from app.services import hh
+    f = tmp_path / "hh_token.json"
+    f.write_text('{"access_token": "x", "expires_at": 9999999999}')
+    monkeypatch.delenv("HH_DEMO", raising=False)
+    monkeypatch.setenv("HH_TOKEN_FILE", str(f))
+    sent = {}
+
+    class R:
+        status_code = 200
+        def json(self):
+            return {"found": 0, "items": []}
+
+    def fake_get(url, params=None, **kw):
+        sent["params"] = params
+        return R()
+    monkeypatch.setattr(hh.httpx, "get", fake_get)
+    hh.search("торговый агент", area="tashkent", experience="1+")
+    assert ("area", 2759) in sent["params"]
+    assert [v for k, v in sent["params"] if k == "experience"] == ["between1And3", "between3And6", "moreThan6"]
+    with pytest.raises(hh.HhError):
+        hh.search("x", area="mars")
+    with pytest.raises(hh.HhError):
+        hh.search("x", experience="2+")

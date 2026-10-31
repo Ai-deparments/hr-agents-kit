@@ -546,12 +546,15 @@ def _sales_ranking(ctx: Ctx, month: str | None = None, branch_id: int | None = N
 # ---------------- added after the group test: tools the HR agent was missing ----------------
 
 @tool("hh_search", "Search résumés on hh.uz (read-only; contacts are opened by a person on hh.uz, never bought here). "
-      "Returns up to 10: title, age, salary, experience, area, url.", {"text": S, "experience": S}, min_role="hr_head",
-      required=["text"])
-def _hh_search(ctx: Ctx, text: str, experience: str = ""):
+      "Returns up to 10: title, age, salary, experience, area, url. Put the city in `area`, never in `text` "
+      "(uz = whole country). `experience`: '1+', '3+', '6+' for 'N years or more', or one exact hh bucket.",
+      {"text": S, "area": {**S, "enum": ["uz", "tashkent", "samarkand", "bukhara", "andijan", "fergana", "namangan"]},
+       "experience": {**S, "enum": ["1+", "3+", "6+", "noExperience", "between1And3", "between3And6", "moreThan6"]}},
+      min_role="hr_head", required=["text"])
+def _hh_search(ctx: Ctx, text: str, area: str = "uz", experience: str = ""):
     from ..services import hh
     try:
-        r = hh.search(text, experience=experience)
+        r = hh.search(text, area=area, experience=experience)
     except hh.HhError as e:
         return {"error": str(e), "status": hh.status()}
     items = r.get("items", r) if isinstance(r, dict) else r
