@@ -102,3 +102,11 @@ def test_tool_needs_hr_head(db, hh_live):
     assert "hh_vacancy_post" not in [t.name for t in tools_for(["hh_vacancy_post"], mgr)]
     out = json.loads(execute(Ctx(db, mgr, "hr"), TOOLS["hh_vacancy_post"], {"vacancy_id": v.id}))
     assert "error" in out and not hh_post.PENDING
+
+
+def test_publish_shortcut_only_short_and_never_for_hh():
+    from app.bots.main import HH_WORD, _publish_word
+    assert _publish_word("joyla") and _publish_word("e'lon qil")
+    assert not _publish_word("toshkentda savdo agenti uchun vakansiya joylab ber: maosh 8-12 mln, 6/1")  # a new brief
+    assert HH_WORD.search("hh.uz ga joyla") and HH_WORD.search("headhunterga post joylolisinmi?")
+    assert not HH_WORD.search("shhh joyla")

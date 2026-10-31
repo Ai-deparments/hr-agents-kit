@@ -193,11 +193,13 @@ def agent_router(agent: str | None) -> Router:
             res = await asyncio.to_thread(_request_decide, uid, text, replied)
             if res is not None:
                 return await m.answer(_request_answer(res))
-        if (m.chat.type == "private" or hr_group) and agent in (None, "rauf") and scope.at_least("hr_head"):
+        # hh.uz posts go to the agent (card with «Ha» / «Qayta yaratish»), not to the bot-list shortcut below
+        if ((m.chat.type == "private" or hr_group) and agent in (None, "rauf") and scope.at_least("hr_head")
+                and not HH_WORD.search(low)):
             card = re.search(r"📝 #(\d{1,9})", _replied_text(m))
             if card:
                 VDRAFT[uid] = int(card.group(1))
-            elif uid not in VDRAFT and VAC_PUBLISH.search(low):
+            elif uid not in VDRAFT and _publish_word(low):
                 last = await asyncio.to_thread(_last_draft, uid)
                 if last:
                     VDRAFT[uid] = last
@@ -637,6 +639,12 @@ _VAC_NOUN = re.compile(r"(vakans|ваканси|e'lon|elon|объявлени|jo
 _VAC_VERB = re.compile(r"(yoz|tuz|yarat|tay+orla|tay+or|post|напиш|состав|созда|сделай|подготов|write|create)")
 VAC_PUBLISH = re.compile(r"(e'?lon qil|chop et|joyla|tasdiqla|publish|опубликуй|выложи|размести|утверждаю)")
 VAC_CANCEL = re.compile(r"^(bekor|o'chir|отмен|удали|не надо)")
+HH_WORD = re.compile(r"\bhh\b|head ?hunter|хедхантер|\bхх\.уз")
+
+
+def _publish_word(low: str) -> bool:
+    """«joyla» / «опубликуй» publishes a draft only as a short confirmation: a sentence with details is a new brief."""
+    return len(low.split()) <= 6 and bool(VAC_PUBLISH.search(low))
 VAC_EDIT = re.compile(r"(maosh|oylik|talab|vazifa|ish vaqt|grafik|filial|matn|qisqa|uzun|qo'sh|olib tashla|o'zgartir|"
                       r"qayta yoz|зарплат|оклад|требован|обязанност|график|филиал|текст|короче|длинн|добав|убери|измени|перепиш)")
 VAC_VARIANTS = re.compile(r"(variant|вариант)")
