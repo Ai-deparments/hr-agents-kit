@@ -71,3 +71,17 @@ def test_live_search_sends_area_and_experience_range(monkeypatch, tmp_path):
         hh.search("x", area="mars")
     with pytest.raises(hh.HhError):
         hh.search("x", experience="2+")
+
+
+def test_agent_search_hints_russian_for_latin_query(monkeypatch, tmp_path):
+    import json as _json
+    from app.agents.tools import TOOLS, Ctx, execute
+    from app.db import SessionLocal
+    from app.rbac import Scope
+    from app.services import hh
+    monkeypatch.setattr(hh, "search", lambda text, area="uz", experience="": {"found": 1, "items": []})
+    monkeypatch.setattr(hh, "status", lambda: {"mode": "live", "ok": True})
+    with SessionLocal() as db:
+        ctx = Ctx(db, Scope("tg:1", "owner", None, True), "hr")
+        assert "hint" in _json.loads(execute(ctx, TOOLS["hh_search"], {"text": "supervayzer"}))
+        assert "hint" not in _json.loads(execute(ctx, TOOLS["hh_search"], {"text": "супервайзер OR supervayzer"}))
