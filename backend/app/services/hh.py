@@ -51,7 +51,8 @@ def status() -> dict:
 
 
 def _ua() -> str:
-    return os.getenv("HH_USER_AGENT", "HRAgentsKit/1.0 (hr@example.com)")
+    # hh blacklists placeholder contacts like example.com (400 bad_user_agent)
+    return os.getenv("HH_USER_AGENT", "HRAgentsKit/1.0 (github.com/Ai-deparments/hr-agents-kit)")
 
 
 def search(text: str, area: str = "uz", experience: str = "", salary_to: int | None = None, page: int = 0) -> dict:
