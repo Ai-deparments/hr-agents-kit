@@ -562,6 +562,26 @@ def _hh_search(ctx: Ctx, text: str, area: str = "uz", experience: str = ""):
             "items": (items or [])[:10]}
 
 
+@tool("hh_vacancy_post", "Prepare a vacancy for hh.uz (write it with vacancy_write first if there is none). The bot then "
+      "shows HR a card with «Ha» / «Qayta yaratish» buttons; it is published only when a person presses «Ha», "
+      "with the free publication only. Never say it is already published.", {"vacancy_id": I}, min_role="hr_head",
+      required=["vacancy_id"])
+def _hh_vacancy_post(ctx: Ctx, vacancy_id: int):
+    from ..services import hh_post
+    if not ctx.scope.at_least("hr_head"):  # outward-facing: checked here too, not only by hiding the tool
+        raise PermissionError("hr_head only")
+    v = ctx.db.get(Vacancy, vacancy_id)
+    if not v:
+        return {"error": "not found"}
+    try:
+        p = hh_post.prepare(v, ctx.scope.actor)
+    except ValueError as e:
+        return {"error": str(e)}
+    return {"vacancy_id": v.id, "role": p["role"], "free_publications_left": p["free_left"],
+            "next": "A card with the hh post and the «Ha» / «Qayta yaratish» buttons is sent right after your answer. "
+                    "Answer in one short line; do not repeat the post text."}
+
+
 @tool("interview_slots", "Interview time slots from today: free and booked (with the candidate).", min_role="hr_head")
 def _slots(ctx: Ctx):
     from ..models import InterviewSlot

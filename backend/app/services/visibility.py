@@ -27,7 +27,7 @@ TOOL_CATEGORY = {
     **{t: "people" for t in ("search_employee", "employee_card", "headcount", "turnover", "documents_expiring",
                              "hr_document", "new_hires")},
     **{t: "recruiting" for t in ("vacancies_sla", "vacancies_list", "candidates", "vacancy_draft", "vacancy_write",
-                                 "vacancy_publish", "ads_deals", "ads_add_channel", "interview_invite", "hh_search",
+                                 "vacancy_publish", "ads_deals", "ads_add_channel", "interview_invite", "hh_search", "hh_vacancy_post",
                                  "interview_slots", "interview_slots_add", "job_offer")},
     **{t: "onboarding" for t in ("onboarding_status", "onboarding_plan", "onboarding_add", "onboarding_score",
                                  "onboarding_mark_item", "onboarding_course_plan", "onboarding_course_start",

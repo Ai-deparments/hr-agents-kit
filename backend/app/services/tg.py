@@ -25,6 +25,11 @@ def e(name: str) -> str:
     return fb
 
 
+def emoji_id(name: str) -> str | None:
+    """Custom emoji id for a button icon (icon_custom_emoji_id); None when premium emoji are off or unknown."""
+    return (_emoji().get(name) or {}).get("id") if cfg("bot.premium_emoji", True) else None
+
+
 def me(name: str) -> str:
     """Premium emoji in rich Markdown: ![fallback](tg://emoji?id=ID); plain emoji when the registry has no id."""
     it = _emoji().get(name) or {}

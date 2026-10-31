@@ -157,6 +157,8 @@ recruiting:
     language: uz                  # uz | ru | en — fixed texts the candidate gets (invite, reject, booking, reminders)
     remind_day_before_at: "18:00" # reminder the day before (skipped if the slot was booked after this time)
     remind_minutes_before: 60     # and this many minutes before
+  hh_billing: free            # hh.uz posts: the only billing type the agent may use (paid tariffs = a person on hh.uz)
+  hh_area: tashkent           # default hh area when the branch city is unknown
 
 ads:
   budget_min: 10000

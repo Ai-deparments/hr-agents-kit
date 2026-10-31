@@ -7,15 +7,18 @@ python -m app.bots.main"""
 from __future__ import annotations
 
 import asyncio
+import html
 import logging
 import re
 from contextvars import ContextVar
 from datetime import date, datetime, timedelta
 
 from aiogram import Bot, Dispatcher, F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.types import (BufferedInputFile, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton,
-                           Message, ReplyKeyboardMarkup, ReplyKeyboardRemove, WebAppInfo)
+                           LinkPreviewOptions, Message, ReplyKeyboardMarkup, ReplyKeyboardRemove, WebAppInfo)
+import httpx
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy import select
 
@@ -25,7 +28,7 @@ from ..config import cfg, settings
 from ..db import SessionLocal, init_db
 from ..models import BranchLead, Candidate, Employee, Vacancy
 from ..rbac import Scope, scope_for_telegram
-from ..services import interview, notifications, recruiting, reports
+from ..services import interview, notifications, recruiting, reports, tg
 
 log = logging.getLogger("bots")
 SYSTEM = Scope("system", "owner", None, True)
@@ -235,8 +238,138 @@ def agent_router(agent: str | None) -> Router:
             key = f"grp:{m.chat.id}:{thread or 0}"
         answer = await asyncio.to_thread(_answer_sync, target, m.from_user.id, ask, key, hr_group)
         await reply_rich(m, answer)
+        from ..services import hh_post
+        if (vid := hh_post.CARDS.pop(f"tg:{uid}", None)) is not None:  # the agent prepared an hh post: ask with buttons
+            await send_hh_card(bot, m.chat.id, vid, m.message_thread_id if m.is_topic_message else None)
+
+    @r.callback_query(F.data.regexp(r"^hhp:(ok|redo):\d{1,9}$"))
+    async def on_hh_card(c: CallbackQuery, bot: Bot):
+        _, act, raw = c.data.split(":")
+        vid = int(raw)
+        with SessionLocal() as db:
+            allowed = scope_for_telegram(db, c.from_user.id).at_least("hr_head")
+        if not allowed:
+            return await c.answer(L("Ruxsat yo'q", "Нет доступа"), show_alert=True)
+        if vid in HH_BUSY:
+            return await c.answer(L("Bajarilmoqda…", "Выполняется…"))
+        HH_BUSY.add(vid)
+        thread = c.message.message_thread_id if c.message and c.message.is_topic_message else None
+        try:
+            await c.answer(L("Joylanmoqda…", "Размещаю…") if act == "ok" else L("Qayta yozilmoqda…", "Переписываю…"))
+            await c.message.edit_reply_markup(reply_markup=None)  # one press: the buttons go away at once
+            if act == "ok":
+                ok, out = await asyncio.to_thread(_hh_publish, c.from_user.id, vid)
+                if not ok:
+                    await c.message.edit_reply_markup(reply_markup=_hh_kb(vid))
+                    return await c.message.answer(f"{tg.e('cross')} {_esc(out)}")
+                text = (f"{tg.e('check')} " + L(f"#{vid} hh.uz da joylandi (bepul e'lon, 30 kun).",
+                                                f"#{vid} размещена на hh.uz (бесплатно, 30 дней).")
+                        + f'\n<a href="https://hh.uz/vacancy/{_esc(out)}">Link</a>')
+                return await c.message.answer(text, link_preview_options=LinkPreviewOptions(is_disabled=True))
+            err = await asyncio.to_thread(_hh_redo, c.from_user.id, vid)
+            if err:
+                await c.message.edit_reply_markup(reply_markup=_hh_kb(vid))
+                return await c.message.answer(f"{tg.e('cross')} {_esc(err)}")
+            await send_hh_card(bot, c.message.chat.id, vid, thread)
+        finally:
+            HH_BUSY.discard(vid)
 
     return r
+
+
+# ---------------- hh.uz post: card + «Ha» / «Qayta yaratish» (a person decides, free publication only) ----------------
+
+HH_BUSY: set[int] = set()
+HH_LABELS = {"noExperience": "tajribasiz", "between1And3": "1–3 yil", "between3And6": "3–6 yil", "moreThan6": "6+ yil",
+             "FULL": "to'liq bandlik", "PART": "yarim stavka", "PROJECT": "loyiha", "SIDE_JOB": "qo'shimcha ish",
+             "ON_SITE": "ish joyida", "REMOTE": "masofadan", "HYBRID": "gibrid", "FIELD_WORK": "yo'lda (dala ishi)",
+             "SIX_ON_ONE_OFF": "6/1", "FIVE_ON_TWO_OFF": "5/2", "FOUR_ON_THREE_OFF": "4/3", "TWO_ON_TWO_OFF": "2/2",
+             "THREE_ON_THREE_OFF": "3/3", "WEEKEND": "dam olish kunlari", "FLEXIBLE": "erkin", "OTHER": "kelishiladi"}
+HH_AREAS = {"uz": "O'zbekiston", "tashkent": "Toshkent", "samarkand": "Samarqand", "bukhara": "Buxoro",
+            "andijan": "Andijon", "fergana": "Farg'ona", "namangan": "Namangan"}
+
+
+def _hh_kb(vid: int, icons: bool = True) -> InlineKeyboardMarkup:
+    ok, no = (tg.emoji_id("check"), tg.emoji_id("cross")) if icons else (None, None)
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="Ha" if ok else "✅ Ha", callback_data=f"hhp:ok:{vid}", style="success",
+                             icon_custom_emoji_id=ok),
+        InlineKeyboardButton(text="Qayta yaratish" if no else "❌ Qayta yaratish", callback_data=f"hhp:redo:{vid}",
+                             style="danger", icon_custom_emoji_id=no)]])
+
+
+def _hh_card_text(vid: int) -> str | None:
+    from ..services import hh, hh_post
+    b = hh_post.PENDING.get(vid)
+    if not b:
+        return None
+    area = next((HH_AREAS[k] for k, i in hh.AREAS.items() if str(i) == b["area"]["id"]), b["area"]["id"])
+    role = hh_post.roles().get(b["professional_roles"][0]["id"], "")
+    hours = b["working_hours"][0]["id"]
+    hours = f"{hours[6:]} soat" if hours.startswith("HOURS_") else HH_LABELS.get(hours, hours)
+    s = b.get("salary_range") or {}
+    money = " – ".join(f"{s[k]:,}".replace(",", " ") for k in ("from", "to") if s.get(k))
+    desc = re.sub(r"\n{2,}", "\n", re.sub(r"<(li)>", "• ", re.sub(r"</(p|li|ul)>", "\n", b["description"])))
+    desc = html.unescape(re.sub(r"<[^>]+>", "", desc)).strip()
+    if len(desc) > 1800:
+        desc = desc[:1800].rsplit("\n", 1)[0] + "\n…"
+    return (f"{tg.e('check')} <b>{L('hh.uz uchun e’lon tayyor', 'Объявление для hh.uz готово')}</b> · #{vid}\n\n"
+            f"<b>{_esc(b['name'])}</b>\n"
+            f"📍 {_esc(area)} · {_esc(role)}\n"
+            f"🧭 {L('Tajriba', 'Опыт')}: {HH_LABELS[b['experience']['id']]} · {HH_LABELS[b['employment_form']['id']]} · "
+            f"{HH_LABELS[b['work_format'][0]['id']]}\n"
+            f"🕘 {HH_LABELS[b['work_schedule_by_days'][0]['id']]} · {_esc(hours)}\n"
+            f"💰 {_esc(money + ' so‘m') if money else L('kelishiladi', 'по договорённости')}\n\n"
+            f"<blockquote expandable>{_esc(desc)}</blockquote>\n\n"
+            + L("Bepul e'lon (30 kun). «Ha» — hh.uz ga joylayman, «Qayta yaratish» — matnni yangidan yozaman.",
+                "Бесплатная публикация (30 дней). «Ha» — размещу на hh.uz, «Qayta yaratish» — перепишу текст."))
+
+
+async def send_hh_card(bot: Bot, chat_id: int, vid: int, thread: int | None) -> None:
+    text = await asyncio.to_thread(_hh_card_text, vid)
+    if not text:
+        return
+    for icons in (True, False):  # button icons need the bot owner's Premium: plain emoji buttons otherwise
+        try:
+            await bot.send_message(chat_id, text, reply_markup=_hh_kb(vid, icons), message_thread_id=thread)
+            return
+        except TelegramBadRequest as e:
+            log.warning("hh card (icons=%s): %s", icons, e)
+
+
+def _hh_publish(tg_id: int, vid: int) -> tuple[bool, str]:
+    from ..services import hh_post
+    with SessionLocal() as db:
+        v = db.get(Vacancy, vid)
+        if not v:
+            return False, L("Topilmadi", "Не найдено")
+        try:
+            hid = hh_post.publish(db, _hr_scope(tg_id), v)
+        except (ValueError, httpx.HTTPError) as e:
+            db.rollback()
+            log.warning("hh publish #%s: %s", vid, e)
+            return False, str(e)
+        db.commit()
+        return True, hid
+
+
+def _hh_redo(tg_id: int, vid: int) -> str | None:
+    """«Qayta yaratish»: the writer rewrites the vacancy text, then the hh fields are picked again."""
+    from ..services import hh_post, vacancies
+    with SessionLocal() as db:
+        v = db.get(Vacancy, vid)
+        if not v:
+            return L("Topilmadi", "Не найдено")
+        scope = _hr_scope(tg_id)
+        try:
+            vacancies.rewrite(db, scope, v, "Qayta yarat: xuddi shu ma'lumotlar bilan matnni yangidan, boshqacha yoz.")
+            db.commit()
+            hh_post.prepare(v, scope.actor)
+        except (ValueError, httpx.HTTPError) as e:
+            db.rollback()
+            return str(e)
+        hh_post.CARDS.pop(scope.actor, None)  # the button handler sends the card itself
+    return None
 
 
 GROUP_COMMANDS = {"/hisobot", "/davomat"}  # aggregate-only commands allowed in group chats
