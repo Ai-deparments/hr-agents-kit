@@ -129,6 +129,10 @@ def fields(v: Vacancy) -> dict:
         raise ValueError("AI hozir ishlamayapti — birozdan keyin qayta urinib ko'ring · ИИ недоступен, попробуйте позже")
     if f.get("role_id") not in roles():
         raise ValueError("hh: kasb toifasi topilmadi · не найдена профроль hh")
+    for k, allowed in (("area", list(hh.AREAS)), ("experience", EXPERIENCE), ("employment_form", EMPLOYMENT),
+                       ("work_format", WORK_FORMAT), ("work_schedule_by_days", DAYS), ("working_hours", HOURS)):
+        if f.get(k) not in allowed:  # the CLI path may not enforce the schema: only hh dictionary values pass
+            raise ValueError(f"hh: {k} noto'g'ri — «Qayta yaratish» ni bosing · неверное поле {k}")
     if not re.search(r"\d", v.salary_text or ""):
         f["salary_from"] = f["salary_to"] = 0  # a salary appears on hh only if HR wrote one
     for k in ("salary_from", "salary_to"):
