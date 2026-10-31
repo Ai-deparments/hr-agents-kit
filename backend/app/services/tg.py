@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 from functools import lru_cache
 from pathlib import Path
 
@@ -46,6 +47,23 @@ def md_table(head: list[str], rows: list[list], align: str = "") -> str:
     lines = ["| " + " | ".join(head) + " |", "|" + "|".join(sep) + "|"]
     lines += ["| " + " | ".join(str(c) for c in r) + " |" for r in rows]
     return "\n".join(lines)
+
+
+_URL = re.compile(r"(?<![(<\[\"'=/\w])https?://[^\s<>()\[\]`\"']+")
+_CODE = re.compile(r"(```.*?```|`[^`\n]*`)", re.S)
+LONG_URL = 40
+
+
+def short_links(text: str, word: str = "Link") -> str:
+    """Bare long URLs in agent Markdown -> [Link](url): neater than a two-line hh link. Code and existing links untouched."""
+    def one(m: re.Match) -> str:
+        url = m.group(0)
+        tail = ""
+        while url and url[-1] in ".,;:!?":
+            url, tail = url[:-1], url[-1] + tail
+        return (f"[{word}]({url})" if len(url) > LONG_URL else url) + tail
+    parts = _CODE.split(text or "")
+    return "".join(p if i % 2 else _URL.sub(one, p) for i, p in enumerate(parts))
 
 
 def esc(s) -> str:

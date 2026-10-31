@@ -326,9 +326,10 @@ async def reply_rich(m: Message, answer: str) -> None:
     """Agent answers are Markdown: send as a Telegram rich message (real tables, headings, lists);
     plain escaped text if the client / API refuses it."""
     from aiogram.types import InputRichMessage
+    from ..services.tg import short_links
     if answer and len(answer) <= 32000:
         try:
-            await m.bot.send_rich_message(m.chat.id, InputRichMessage(markdown=answer),
+            await m.bot.send_rich_message(m.chat.id, InputRichMessage(markdown=short_links(answer)),
                                           message_thread_id=m.message_thread_id if m.is_topic_message else None)
             return
         except Exception as e:
@@ -946,7 +947,7 @@ class Sender:
                 sent = False
                 if rich and len(rich) <= 32000:
                     try:
-                        await b.send_rich_message(i, InputRichMessage(markdown=rich), message_thread_id=thread)
+                        await b.send_rich_message(i, InputRichMessage(markdown=tg.short_links(rich)), message_thread_id=thread)
                         sent = True
                     except Exception as e:  # older clients / API reject -> plain HTML below
                         log.warning("rich message to %s failed, falling back to HTML: %s", i, e)
