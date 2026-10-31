@@ -96,6 +96,15 @@ def test_no_free_publication_no_salary_invented_stale_card(db, hh_live):
     assert not hh_live["posted"]
 
 
+def test_tool_writes_a_new_vacancy_from_brief(db, hh_live, monkeypatch):
+    from app.services import vacancies
+    monkeypatch.setattr(vacancies, "from_brief", lambda db, scope, brief: _vac(db))
+    old = _vac(db)
+    out = json.loads(execute(Ctx(db, OWNER, "hr"), TOOLS["hh_vacancy_post"], {"brief": "Toshkentda savdo agenti"}))
+    assert out["vacancy_id"] != old.id and hh_post.CARDS["tg:1"] == out["vacancy_id"]
+    assert "error" in json.loads(execute(Ctx(db, OWNER, "hr"), TOOLS["hh_vacancy_post"], {}))
+
+
 def test_tool_needs_hr_head(db, hh_live):
     v = _vac(db)
     mgr = Scope("tg:5", "manager", None, False)

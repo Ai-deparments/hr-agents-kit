@@ -562,15 +562,21 @@ def _hh_search(ctx: Ctx, text: str, area: str = "uz", experience: str = ""):
             "items": (items or [])[:10]}
 
 
-@tool("hh_vacancy_post", "Prepare a vacancy for hh.uz (write it with vacancy_write first if there is none). The bot then "
-      "shows HR a card with «Ha» / «Qayta yaratish» buttons; it is published only when a person presses «Ha», "
-      "with the free publication only. Never say it is already published.", {"vacancy_id": I}, min_role="hr_head",
-      required=["vacancy_id"])
-def _hh_vacancy_post(ctx: Ctx, vacancy_id: int):
-    from ..services import hh_post
+@tool("hh_vacancy_post", "Prepare a vacancy post for hh.uz. Pass HR's own words about the job as `brief` — a NEW vacancy "
+      "is written from them. Pass `vacancy_id` only when HR names an existing vacancy number (#12). The bot then shows "
+      "HR a card with «Ha» / «Qayta yaratish» buttons; it is published only when a person presses «Ha», with the free "
+      "publication only. Never say it is already published.", {"brief": S, "vacancy_id": I}, min_role="hr_head")
+def _hh_vacancy_post(ctx: Ctx, brief: str = "", vacancy_id: int | None = None):
+    from ..services import hh_post, vacancies
     if not ctx.scope.at_least("hr_head"):  # outward-facing: checked here too, not only by hiding the tool
         raise PermissionError("hr_head only")
-    v = ctx.db.get(Vacancy, vacancy_id)
+    if brief.strip():
+        v = vacancies.from_brief(ctx.db, ctx.scope, brief)
+        ctx.db.commit()
+    elif vacancy_id:
+        v = ctx.db.get(Vacancy, vacancy_id)
+    else:
+        return {"error": "give brief (HR's words about the job) or vacancy_id"}
     if not v:
         return {"error": "not found"}
     try:
