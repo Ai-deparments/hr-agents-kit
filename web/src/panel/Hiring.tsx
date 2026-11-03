@@ -125,16 +125,8 @@ export function CandidateHiring({ cand, write, onChanged }: { cand: any; write: 
       {msg && <div className="note">{msg}</div>}
       <Err e={err} />
       {write && d.telegram && cand.status !== "hired" && !offer && <div className="row">
-<<<<<<< HEAD
-        <button className="btn" onClick={() => setInviting(true)}>🗓 {t.l("Suhbatga taklif", "Пригласить на собеседование", "Invite to interview")}</button>
-        <button className="btn primary" onClick={() => setOffer(true)}>📄 {t.l("Ish taklifi", "Отправить оффер", "Send offer")}</button>
-=======
-        <button className="btn" onClick={async () => {
-          try { const r = await api<any>(`/api/candidates/${cand.id}/invite`, { body: {} }); setMsg(t.l(`Yuborildi: ${r.offered} ta vaqt`, `Отправлено: ${r.offered} слотов`, `Sent ${r.offered} slots`)); st.reload(); }
-          catch (x: any) { setErr(x.message); }
-        }}><CalendarDays className="ic inl" size={14} aria-hidden="true" /> {t.l("Suhbatga taklif", "Пригласить на собеседование", "Invite to interview")}</button>
+        <button className="btn" onClick={() => setInviting(true)}><CalendarDays className="ic inl" size={14} aria-hidden="true" /> {t.l("Suhbatga taklif", "Пригласить на собеседование", "Invite to interview")}</button>
         <button className="btn primary" onClick={() => setOffer(true)}><FileText className="ic inl" size={14} aria-hidden="true" /> {t.l("Ish taklifi", "Отправить оффер", "Send offer")}</button>
->>>>>>> 13bd074 (feat(web): lucide-react icons and react-bits CountUp instead of hand-drawn icons and emoji)
       </div>}
       {offer && <form className="form" onSubmit={async (e) => {
         e.preventDefault();

@@ -9,6 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..models import AttendanceEvent, Candidate, Employee, ExternalRef, LeaveRequest, Registration
+from ..config import cfg
 from ..rbac import Scope
 from . import analytics, attendance
 
@@ -44,8 +45,8 @@ def active(db: Session, scope: Scope) -> dict:
     return {
         "title": "Faol xodimlar", "value": len(emps),
         "formula": "Holati «ishdan bo'shatilgan» bo'lmagan barcha xodimlar (faol + sinov muddatida), sizning filiallaringiz bo'yicha.",
-        "sources": [{"name": "TimePay", "detail": "bosh ofis xodimlari, har 15 daqiqada (07–21)"},
-                    {"name": "Smartup", "detail": "savdo agentlari, har kuni 06:15"},
+        "sources": [{"name": "TimePay", "detail": "import (ops jadvali bo'yicha), agar ulangan bo'lsa"},
+                    {"name": "Smartup", "detail": "savdo agentlari importi, agar ulangan bo'lsa"},
                     {"name": "Panel / bot", "detail": "qo'lda qo'shilgan va botdan ro'yxatdan o'tganlar"}],
         "groups": [
             {"title": "Manba bo'yicha", "items": [{"label": k, "value": v} for k, v in
@@ -123,7 +124,7 @@ def inbox(db: Session, scope: Scope) -> dict:
         "title": "Botdan arizalar", "value": len(regs),
         "formula": "Katta son — botda «Men xodimman» deb ro'yxatdan o'tib, tasdiq kutayotganlar. Pastda — intervyudan o'tgan "
                    "yangi nomzodlar va xodimlarning ko'rib chiqilmagan so'rovlari (ta'til, ma'lumotnoma va h.k.).",
-        "sources": [{"name": "Telegram bot", "detail": "@kersys_hr_ai"}],
+        "sources": [{"name": "Telegram bot", "detail": cfg("company.recruiter_bot", "") or "HR bot"}],
         "groups": [{"title": "Kutmoqda", "items": [{"label": "ro'yxatdan o'tish", "value": len(regs)},
                                                    {"label": "yangi nomzod", "value": len(cands)},
                                                    {"label": "xodim so'rovi", "value": len(reqs)}]}],

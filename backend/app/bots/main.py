@@ -1063,7 +1063,7 @@ async def send_outbox(sender: Sender) -> None:
                     thread = topics.thread_for(db, o.topic) if o.topic else None
                     await b.send_message(o.telegram_id, _esc(o.text), message_thread_id=thread)
                 ok = True
-                o.text = re.sub(r"(Parol / Пароль: )\S+", r"***", o.text)  # panel passwords don't stay in the DB
+                o.text = re.sub(r"(Parol / Пароль: )\S+", r"\1***", o.text)  # panel passwords don't stay in the DB
             except Exception as e:
                 err = str(e)
             outbox.finish(db, o, ok, err)
