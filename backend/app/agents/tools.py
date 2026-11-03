@@ -25,6 +25,7 @@ class Ctx:
     depth: int = 0
     asked_agents: list[str] = field(default_factory=list)
     user_text: str = ""  # the person's own message in this turn (empty for agent-to-agent questions)
+    run_id: str = field(default_factory=lambda: __import__("uuid").uuid4().hex)  # one agent run = one user message
 
 
 @dataclass
@@ -805,3 +806,58 @@ def _panel_user_update(ctx: Ctx, username: str, role: str = "", can_see_payroll:
 def _panel_role_set(ctx: Ctx, code: str, perms: list[str], name: str = ""):
     from ..services import panel_access as pa
     return _pa_call(ctx, pa.set_role, code, list(perms or []), name or None)
+
+
+# ---------------- HR edits in words (panel chat and bot): propose -> person says "ha" -> confirm ----------------
+
+def _edit(ctx: Ctx, fn, *a, **kw):
+    from ..services import agent_edits as ae
+    try:
+        return fn(ctx.db, ctx.scope, ctx.run_id, *a, **kw)
+    except ae.EditError as e:
+        ctx.db.rollback()
+        return {"error": str(e)}
+
+
+@tool("employee_change", "Change an employee card on HR's request: status (probation -> active = remove the probation "
+      "period, 'sinov muddatini olib tashlash'), position, department, branch, phone, hire_date YYYY-MM-DD, base_salary, "
+      "pay_type, schedule_code, leave_balance_days. `employee` = name or #id. Nothing is saved here: it returns the "
+      "diff and a change_id; show the diff in one or two lines and ask 'Tasdiqlaysizmi?'. Apply ONLY after the person "
+      "answers yes in their next message, with confirm_change. Firing is not done here (panel, with a reason).",
+      {"employee": S, "status": {**S, "enum": ["active", "probation"]}, "position": S, "department": S, "branch": S,
+       "phone": S, "hire_date": S, "base_salary": I, "pay_type": {**S, "enum": ["monthly", "hourly", "daily"]},
+       "schedule_code": S, "leave_balance_days": {"type": "number"}}, min_role="hr_head", required=["employee"])
+def _employee_change(ctx: Ctx, employee: str, **fields):
+    from ..services import agent_edits as ae
+    return _edit(ctx, ae.propose, employee, fields=fields)
+
+
+@tool("payroll_entry_add", "Add a payroll entry for one employee on HR's request: advance, bonus, penalty, other "
+      "(sums), warning, kpi (score 0-120). Needs a reason. Returns a preview + change_id; save only after the person "
+      "says yes in the next message (confirm_change).",
+      {"employee": S, "kind": {**S, "enum": ["advance", "bonus", "penalty", "other", "warning", "kpi"]}, "amount": I,
+       "month": {**S, "description": "YYYY-MM, default this month"}, "reason": S},
+      min_role="hr_head", required=["employee", "kind", "reason"])
+def _payroll_entry_add(ctx: Ctx, employee: str, kind: str, reason: str, amount: int = 0, month: str = ""):
+    from ..services import agent_edits as ae
+    return _edit(ctx, ae.propose, employee, entry={"kind": kind, "amount": amount, "month": month or None, "reason": reason})
+
+
+@tool("confirm_change", "Apply the change shown before (employee_change / payroll_entry_add), ONLY when the person "
+      "has just answered yes (ha / да / tasdiqlayman) to it. change_id from the preview if you have it; without it the "
+      "person's last pending change is applied.",
+      {"change_id": S}, min_role="hr_head")
+def _confirm_change(ctx: Ctx, change_id: str = ""):
+    from ..services import agent_edits as ae
+    return _edit(ctx, ae.confirm, change_id)
+
+
+@tool("employee_pay", "Calculate one employee's pay for a month (default this month) from the timesheet: base, norm "
+      "and worked hours, accrued, KPI, bonus, sales bonus, penalties, advance, to pay, and how it was counted.",
+      {"employee": S, "month": {**S, "description": "YYYY-MM"}}, needs_payroll=True, required=["employee"])
+def _employee_pay(ctx: Ctx, employee: str, month: str = ""):
+    from ..services import agent_edits as ae
+    try:
+        return ae.pay_for(ctx.db, ctx.scope, employee, month or None)
+    except ae.EditError as e:
+        return {"error": str(e)}

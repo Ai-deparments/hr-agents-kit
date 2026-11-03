@@ -4,6 +4,7 @@ import { LangCtx } from "../i18n";
 import { Ic } from "../icons";
 import { AnimatedValue } from "../components/AnimatedValue";
 import { Empty, Err, useLoad } from "../ui";
+import AgentBox from "./AgentBox";
 import { can, usePanel } from "./ctx";
 
 type Day = { day: string; came: number; scheduled: number; late: number };
@@ -113,6 +114,8 @@ export default function Dashboard() {
         <Kpi hero icon="inbox" label={s.regs} value={d.registrations_pending ?? "—"} chip={`${d.new_candidates} ${s.cand}`}
           delta={`${d.pending_requests}`} cmp={s.req} />
       </div>
+
+      <AgentBox lang={lang} />
 
       <section className="card">
         <div className="card-h"><span className="card-t">{s.att}</span><span className="card-s">{s.att14}</span>

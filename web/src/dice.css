@@ -254,3 +254,19 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent-soft
 .viz-tip span { color: var(--text-2); }
 .viz-tip em { margin-left: auto; font-style: normal; font-weight: 600; font-variant-numeric: tabular-nums; }
 @media (max-width: 640px) { .viz { height: 200px; } }
+
+/* dashboard HR agent chat */
+.agent-box { display: flex; flex-direction: column; gap: 10px; }
+.ab-msgs { max-height: 360px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 2px; }
+.ab-msg { max-width: 82%; padding: 9px 12px; border-radius: 10px; font-size: 13px; line-height: 1.45; }
+.ab-msg.user { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 3px; }
+.ab-msg.assistant { align-self: flex-start; background: var(--surface-2); border: 1px solid var(--border); border-bottom-left-radius: 3px; }
+.ab-msg .md-h { font-weight: 700; margin: 2px 0 4px; }
+.ab-msg .md-li { padding-left: 14px; position: relative; }
+.ab-msg .md-li::before { content: ""; position: absolute; left: 4px; top: .6em; width: 4px; height: 4px; border-radius: 50%; background: var(--muted); }
+.ab-msg .md-sp { height: 6px; }
+.ab-msg .md-t { margin: 6px 0; font-size: 12px; }
+.ab-form { display: flex; gap: 8px; }
+.ab-form input { flex: 1; height: 38px; }
+.ab-form .btn { width: 42px; height: 38px; padding: 0; display: grid; place-items: center; }
+.ab-hints { display: flex; flex-wrap: wrap; gap: 6px; }

@@ -59,7 +59,8 @@ AGENTS["hr"].tools = list(dict.fromkeys([t for n in ("hamza", "bexruz", "husayn"
                                          if t != "ask_agent"] + ["vacancies_list", "vacancy_write", "vacancy_publish", "hr_document", "sales_ranking", "hh_search", "hh_vacancy_post", "interview_slots",
                                           "interview_slots_add", "job_offer", "new_hires", "attendance_by_department",
                                           "onboarding_today", "lateness_alert_rule", "panel_access", "panel_invite",
-                                          "panel_invite_decide", "panel_user_create", "panel_user_update", "panel_role_set"]))
+                                          "panel_invite_decide", "panel_user_create", "panel_user_update", "panel_role_set",
+                                          "employee_change", "payroll_entry_add", "confirm_change", "employee_pay"]))
 for _n in ("hamza", "bexruz", "husayn", "ozoda", "rauf"):
     AGENTS["hr"].commands.update(AGENTS[_n].commands)
 
