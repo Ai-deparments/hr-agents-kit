@@ -89,7 +89,8 @@ def dictionaries(scope: Scope = Depends(panel_scope), db: Session = Depends(get_
     return {"regions": [{"id": r.id, "code": r.code, "name": r.name} for r in db.scalars(select(Region))],
             "branches": [{"id": b.id, "code": b.code, "name": b.name, "region_id": b.region_id, "city": b.city, "mode": b.mode,
                           "lat": b.lat, "lon": b.lon, "radius_m": b.radius_m} for b in branches],
-            "positions": [{"id": p.id, "code": p.code, "title": p.title} for p in db.scalars(select(Position))],
+            "positions": [{"id": p.id, "code": p.code, "title": p.title, "is_manager": p.is_manager}
+                          for p in db.scalars(select(Position).order_by(Position.title))],
             "departments": [{"id": d.id, "name": d.name} for d in db.scalars(select(Department).order_by(Department.name))],
             "schedules": list((cfg("schedules") or {}).keys())}
 

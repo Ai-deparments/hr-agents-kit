@@ -6,7 +6,7 @@ export type Branch = { id: number; code: string; name: string; region_id: number
 export type Dicts = {
   regions: { id: number; code: string; name: string }[];
   branches: Branch[];
-  positions: { id: number; code: string; title: string }[];
+  positions: { id: number; code: string; title: string; is_manager?: boolean }[];
   departments: { id: number; name: string }[];
   schedules: string[];
 };

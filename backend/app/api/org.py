@@ -312,6 +312,122 @@ def branch_create(body: BranchIn, scope: Scope = Depends(require("hr.write")), d
     return {"id": b.id, "code": b.code, "name": b.name}
 
 
+class PositionPatch(BaseModel):
+    title: str | None = Field(default=None, min_length=2, max_length=120)
+    is_manager: bool | None = None
+
+
+class RegionPatch(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+
+
+class BranchPatch(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=160)
+    region_id: int | None = None
+    city: str | None = Field(default=None, max_length=80)
+    mode: str | None = Field(default=None, pattern=r"^(day|24/7)$")
+
+
+def _in_use(db: Session, checks: list[tuple[str, int]]) -> None:
+    """Refuse a delete while anything still points at the row (says what, so HR can fix it first)."""
+    busy = [f"{label}: {n}" for label, n in checks if n]
+    if busy:
+        raise HTTPException(409, "In use — " + ", ".join(busy))
+
+
+def _synced(db: Session, kind: str, local_id: int) -> int:
+    from ..models import ExternalRef
+    return db.scalar(select(func.count()).select_from(ExternalRef).where(ExternalRef.kind == kind, ExternalRef.local_id == local_id)) or 0
+
+
+@router.patch("/positions/{pid}")
+def position_update(pid: int, body: PositionPatch, scope: Scope = Depends(require("hr.write")), db: Session = Depends(get_db)):
+    p = db.get(Position, pid)
+    if not p:
+        raise HTTPException(404, "Not found")
+    data = body.model_dump(exclude_unset=True, exclude_none=True)
+    for k, v in data.items():
+        setattr(p, k, v)
+    audit(db, scope, "position_update", f"position:{p.code}", **data)
+    db.commit()
+    return {"id": p.id, "code": p.code, "title": p.title, "is_manager": p.is_manager}
+
+
+@router.delete("/positions/{pid}")
+def position_delete(pid: int, scope: Scope = Depends(require("hr.write")), db: Session = Depends(get_db)):
+    from ..models import KpiMetric
+    p = db.get(Position, pid)
+    if not p:
+        raise HTTPException(404, "Not found")
+    _in_use(db, [("employees", db.scalar(select(func.count()).select_from(Employee).where(Employee.position_id == pid))),
+                 ("KPI", db.scalar(select(func.count()).select_from(KpiMetric).where(KpiMetric.position_id == pid))),
+                 ("TimePay/Smartup", _synced(db, "position", pid))])
+    audit(db, scope, "position_delete", f"position:{p.code}", title=p.title)
+    db.delete(p)
+    db.commit()
+    return {"ok": True}
+
+
+@router.patch("/regions/{rid}")
+def region_update(rid: int, body: RegionPatch, scope: Scope = Depends(require("hr.write")), db: Session = Depends(get_db)):
+    r = db.get(Region, rid)
+    if not r:
+        raise HTTPException(404, "Not found")
+    r.name = body.name
+    audit(db, scope, "region_update", f"region:{r.code}", name=r.name)
+    db.commit()
+    return {"id": r.id, "code": r.code, "name": r.name}
+
+
+@router.delete("/regions/{rid}")
+def region_delete(rid: int, scope: Scope = Depends(require("hr.write")), db: Session = Depends(get_db)):
+    r = db.get(Region, rid)
+    if not r:
+        raise HTTPException(404, "Not found")
+    _in_use(db, [("branches", db.scalar(select(func.count()).select_from(Branch).where(Branch.region_id == rid)))])
+    audit(db, scope, "region_delete", f"region:{r.code}", name=r.name)
+    db.delete(r)
+    db.commit()
+    return {"ok": True}
+
+
+@router.patch("/branches/{bid}")
+def branch_update(bid: int, body: BranchPatch, scope: Scope = Depends(require("hr.write")), db: Session = Depends(get_db)):
+    if not scope.all_branches:
+        raise HTTPException(403, "Only users without branch restriction edit branches")
+    b = db.get(Branch, bid)
+    if not b:
+        raise HTTPException(404, "Not found")
+    data = body.model_dump(exclude_unset=True)
+    if "region_id" in data and data["region_id"] is not None and not db.get(Region, data["region_id"]):
+        raise HTTPException(400, "Unknown region")
+    for k, v in data.items():
+        if k in ("name", "mode") and v is None:
+            continue
+        setattr(b, k, v)
+    audit(db, scope, "branch_update", f"branch:{b.code}", **{k: v for k, v in data.items() if v is not None})
+    db.commit()
+    return {"id": b.id, "code": b.code, "name": b.name, "region_id": b.region_id, "city": b.city, "mode": b.mode}
+
+
+@router.delete("/branches/{bid}")
+def branch_delete(bid: int, scope: Scope = Depends(require("hr.write")), db: Session = Depends(get_db)):
+    from ..models import BranchLead, Vacancy
+    if not scope.all_branches:
+        raise HTTPException(403, "Only users without branch restriction delete branches")
+    b = db.get(Branch, bid)
+    if not b:
+        raise HTTPException(404, "Not found")
+    _in_use(db, [("employees", db.scalar(select(func.count()).select_from(Employee).where(Employee.branch_id == bid))),
+                 ("vacancies", db.scalar(select(func.count()).select_from(Vacancy).where(Vacancy.branch_id == bid))),
+                 ("branch leads", db.scalar(select(func.count()).select_from(BranchLead).where(BranchLead.branch_id == bid))),
+                 ("TimePay/Smartup", _synced(db, "branch", bid))])
+    audit(db, scope, "branch_delete", f"branch:{b.code}", name=b.name)
+    db.delete(b)
+    db.commit()
+    return {"ok": True}
+
+
 # ---------------- registrations from the bot ("I am an employee") ----------------
 
 def _reg_row(r: Registration) -> dict:

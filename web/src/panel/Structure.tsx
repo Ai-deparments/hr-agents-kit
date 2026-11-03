@@ -6,12 +6,13 @@ import { can, usePanel } from "./ctx";
 
 type Dept = { id: number; name: string; description: string; headcount: number };
 
-function AddForm({ fields, onSubmit, onClose, title }: {
+function AddForm({ fields, onSubmit, onClose, title, initial }: {
   title: string; onClose: () => void; onSubmit: (v: Record<string, string>) => Promise<unknown>;
   fields: { key: string; label: string; options?: { value: string; label: string }[]; required?: boolean }[];
+  initial?: Record<string, string>;
 }) {
   const t = useT();
-  const [v, setV] = useState<Record<string, string>>(Object.fromEntries(fields.map((f) => [f.key, f.options?.[0]?.value ?? ""])));
+  const [v, setV] = useState<Record<string, string>>(Object.fromEntries(fields.map((f) => [f.key, initial?.[f.key] ?? f.options?.[0]?.value ?? ""])));
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   return (
@@ -72,15 +73,21 @@ function Departments() {
   );
 }
 
+type DictRow = { id: number; label: string; sub: string; initial: Record<string, string> };
+
 function SimpleDict({ kind }: { kind: "positions" | "regions" | "branches" }) {
   const t = useT();
   const { me, dicts, reloadDicts } = usePanel();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState<DictRow | "new" | null>(null);
+  const [err, setErr] = useState<string | null>(null);
   const write = can(me, "hr.write") && (kind !== "branches" || me.branch_scope === null);
   const region = (id: number | null) => dicts.regions.find((r) => r.id === id)?.name;
-  const rows = kind === "positions" ? dicts.positions.map((p) => [p.title, p.code])
-    : kind === "regions" ? dicts.regions.map((r) => [r.name, r.code])
-    : dicts.branches.map((b) => [b.name, `${b.code} · ${dash(region(b.region_id))} · ${b.mode}`]);
+  const rows: DictRow[] = kind === "positions"
+    ? dicts.positions.map((p) => ({ id: p.id, label: p.title, sub: p.is_manager ? `${p.code} · ${t.l("rahbar", "руководящая", "manager")}` : p.code,
+        initial: { title: p.title, is_manager: p.is_manager ? "1" : "" } }))
+    : kind === "regions" ? dicts.regions.map((r) => ({ id: r.id, label: r.name, sub: r.code, initial: { name: r.name } }))
+    : dicts.branches.map((b) => ({ id: b.id, label: b.name, sub: `${b.code} · ${dash(region(b.region_id))} · ${b.mode}`,
+        initial: { name: b.name, city: b.city || "", region_id: b.region_id ? String(b.region_id) : "", mode: b.mode } }));
   const fields = kind === "positions" ? [{ key: "title", label: t("name"), required: true },
     { key: "is_manager", label: t.l("Rahbar lavozimi?", "Руководящая?", "Manager position?"), options: [{ value: "", label: t.l("Yo'q", "Нет", "No") }, { value: "1", label: t.l("Ha", "Да", "Yes") }] }]
     : kind === "regions" ? [{ key: "name", label: t("name"), required: true }]
@@ -91,16 +98,29 @@ function SimpleDict({ kind }: { kind: "positions" | "regions" | "branches" }) {
     const body: Record<string, unknown> = { ...v };
     if (kind === "positions") body.is_manager = v.is_manager === "1";
     if (kind === "branches") body.region_id = v.region_id ? Number(v.region_id) : null;
-    return api(`/api/${kind}`, { body }).then(reloadDicts);
+    return (open && open !== "new" ? api(`/api/${kind}/${open.id}`, { method: "PATCH", body }) : api(`/api/${kind}`, { body })).then(reloadDicts);
+  };
+  const remove = (r: DictRow) => {
+    setErr(null);
+    api(`/api/${kind}/${r.id}`, { method: "DELETE" }).then(reloadDicts).catch((x) => setErr(`${r.label}: ${x.message}`));
   };
   return (
     <div className="card">
       <div className="card-h"><span className="card-t">{t(kind)}</span><span className="card-s">{rows.length}</span>
-        <span className="card-a">{write && <button className="btn sm primary" onClick={() => setOpen(true)}>+ {t("add")}</button>}</span></div>
+        <span className="card-a">{write && <button className="btn sm primary" onClick={() => setOpen("new")}>+ {t("add")}</button>}</span></div>
+      <Err e={err} />
       <div className="table-wrap"><table><tbody>
-        {rows.map(([a, b], i) => <tr key={i}><td>{a}</td><td className="small muted">{b}</td></tr>)}
+        {rows.map((r) => (
+          <tr key={r.id}><td>{r.label}</td><td className="small muted">{r.sub}</td>
+            <td className="num">{write && <div className="row" style={{ justifyContent: "flex-end" }}>
+              <button className="btn sm" onClick={() => setOpen(r)}>{t("edit")}</button>
+              <button className="btn sm danger" onClick={() => remove(r)}
+                title={t.l("Ishlatilmayotgan bo'lsa o'chadi", "Удаляется, только если нигде не используется", "Deletes only if unused")}>{t("delete")}</button>
+            </div>}</td></tr>
+        ))}
       </tbody></table>{rows.length === 0 && <Empty />}</div>
-      {open && <AddForm title={t(kind)} fields={fields} onClose={() => setOpen(false)} onSubmit={submit} />}
+      {open && <AddForm title={open === "new" ? t(kind) : open.label} fields={fields} initial={open === "new" ? undefined : open.initial}
+        onClose={() => setOpen(null)} onSubmit={submit} />}
     </div>
   );
 }
