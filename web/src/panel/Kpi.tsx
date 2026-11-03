@@ -2,6 +2,7 @@ import { useContext, useMemo, useState } from "react";
 import { api, download, money, monthISO } from "../api";
 import { LangCtx, useT } from "../i18n";
 import { Ic } from "../icons";
+import { AnimatedValue } from "../components/AnimatedValue";
 import { Empty, Err, Modal, ReasonModal, useLoad } from "../ui";
 import { can, usePanel } from "./ctx";
 
@@ -133,7 +134,7 @@ function Card({ label, value, unit, chip, note, icon, hero }: { label: string; v
     <div className={`span-3 card kpi${hero ? " kpi-hero" : ""}`}>
       <span className="kpi-ghost"><Ic n={icon} size={44} /></span>
       <span className="kpi-l">{label}</span>
-      <span className="kpi-v">{value}{unit && <span className="u">{unit}</span>}</span>
+      <span className="kpi-v"><AnimatedValue value={value} />{unit && <span className="u">{unit}</span>}</span>
       {chip && <span className="chip-dot">{chip}</span>}
       {note && <div className="cmp">{note}</div>}
     </div>

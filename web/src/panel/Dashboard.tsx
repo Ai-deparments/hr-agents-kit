@@ -1,6 +1,7 @@
 import { useContext } from "react";
 import { LangCtx } from "../i18n";
 import { Ic } from "../icons";
+import { AnimatedValue } from "../components/AnimatedValue";
 import { Empty, Err, useLoad } from "../ui";
 import { can, usePanel } from "./ctx";
 
@@ -75,7 +76,7 @@ function Kpi({ label, value, unit, chip, delta, cmp, icon, hero }: {
     <div className={`span-3 card kpi${hero ? " kpi-hero" : ""}`}>
       <span className="kpi-ghost"><Ic n={icon} size={48} /></span>
       <span className="kpi-l">{label}</span>
-      <span className="kpi-v">{value}{unit && <span className="u">{unit}</span>}</span>
+      <span className="kpi-v"><AnimatedValue value={value} />{unit && <span className="u">{unit}</span>}</span>
       {chip && <span className="chip-dot">{chip}</span>}
       {(delta || cmp) && <div className="cmp">{delta && <span className="dp acc">{delta}</span>} {cmp}</div>}
     </div>

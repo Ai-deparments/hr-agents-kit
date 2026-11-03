@@ -303,7 +303,7 @@ const dict: Record<string, Record<Lang, string>> = {
   ob_issued: { en: "Issued", uz: "Berilgan sana", ru: "Дата выдачи" },
   // recruiting
   rc_vacancies: { en: "Vacancies", uz: "Vakansiyalar", ru: "Вакансии" },
-  rc_raufPanel: { en: "Rauf panel ↗", uz: "Rauf paneli ↗", ru: "Панель Рауфа ↗" },
+  rc_raufPanel: { en: "Rauf panel", uz: "Rauf paneli", ru: "Панель Рауфа" },
   rc_draftBtn: { en: "+ Draft vacancy", uz: "+ Vakansiya qoralamasi", ru: "+ Черновик вакансии" },
   rc_draftTitle: { en: "Draft vacancy", uz: "Vakansiya qoralamasi", ru: "Черновик вакансии" },
   rc_ad: { en: "Ad", uz: "E'lon", ru: "Объявление" },
@@ -433,7 +433,7 @@ const dict: Record<string, Record<Lang, string>> = {
   ma_nobody: { en: "Nobody to link here — ask HR.", uz: "Bu yerda bog'lanadigan xodim yo'q — HR'ga murojaat qiling.", ru: "Здесь некого привязать — обратитесь в HR." },
   ma_last4: { en: "Last 4 digits of your phone", uz: "Telefon raqamingizning oxirgi 4 raqami", ru: "Последние 4 цифры вашего телефона" },
   ma_linkBtn: { en: "Link my Telegram", uz: "Telegram'ni bog'lash", ru: "Привязать мой Telegram" },
-  ma_allowLoc: { en: "📍 Allow location access", uz: "📍 Joylashuvga ruxsat bering", ru: "📍 Разрешите доступ к геолокации" },
+  ma_allowLoc: { en: "Allow location access", uz: "Joylashuvga ruxsat bering", ru: "Разрешите доступ к геолокации" },
   ma_codeLabel: { en: "6-digit code from the head's screen", uz: "Mudir ekranidagi 6 xonali kod", ru: "6-значный код с экрана заведующего" },
   ma_verified: { en: "your check-in place is verified", uz: "joyda ekaningiz tekshiriladi", ru: "место отметки проверяется" },
   ma_openShift: { en: "Your shift from yesterday is still open — press “{b}” when you leave.", uz: "Kechagi smenangiz hali ochiq — ketayotganda «{b}» tugmasini bosing.", ru: "Ваша вчерашняя смена ещё открыта — нажмите «{b}», когда уходите." },

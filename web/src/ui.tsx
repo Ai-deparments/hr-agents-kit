@@ -1,3 +1,4 @@
+import { X } from "lucide-react";
 import { ReactNode, useCallback, useEffect, useState } from "react";
 import { api } from "./api";
 import { useT } from "./i18n";
@@ -31,7 +32,7 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
         <div className="row" style={{ marginBottom: 14 }}>
           <h2 style={{ margin: 0 }}>{title}</h2>
           <span className="spacer" />
-          <button className="btn ghost sm" onClick={onClose} aria-label="Close">✕</button>
+          <button className="btn ghost sm" onClick={onClose} aria-label="Close"><X className="ic inl" size={16} aria-hidden="true" /></button>
         </div>
         {children}
       </div>
@@ -44,7 +45,7 @@ export function Drawer({ onClose, children }: { onClose: () => void; children: R
     <>
       <div className="drawer-overlay" onClick={onClose} />
       <aside className="drawer">
-        <div className="row"><span className="spacer" /><button className="btn ghost sm" onClick={onClose}>✕</button></div>
+        <div className="row"><span className="spacer" /><button className="btn ghost sm" onClick={onClose} aria-label="Close"><X className="ic inl" size={16} aria-hidden="true" /></button></div>
         {children}
       </aside>
     </>

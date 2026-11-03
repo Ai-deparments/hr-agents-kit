@@ -1,3 +1,4 @@
+import { TriangleAlert } from "lucide-react";
 import { Fragment, useState } from "react";
 import { api, money, monthISO } from "../api";
 import { tEnum, useT } from "../i18n";
@@ -73,7 +74,7 @@ export default function Payroll() {
             <tbody>{p.rows.map((r: any) => (
               <Fragment key={r.employee_id}>
                 <tr className="click" onClick={() => setOpen(open === r.employee_id ? null : r.employee_id)}>
-                  <td><b>{r.full_name}</b><div className="muted small">{r.branch} · {r.position}{r.warnings ? ` · ⚠ ${r.warnings}` : ""}</div></td>
+                  <td><b>{r.full_name}</b><div className="muted small">{r.branch} · {r.position}{r.warnings ? <> · <TriangleAlert className="ic inl" size={13} aria-hidden="true" /> {r.warnings}</> : ""}</div></td>
                   <td className="num">{r.worked_hours} / {r.norm_hours}</td><td className="num">{money(r.base)}</td><td className="num">{money(r.accrued)}</td>
                   <td className="num">{money(r.kpi)}</td><td className="num">{money(r.bonus)}</td><td className="num">{money(r.sales_bonus)}</td>
                   <td className="num">{money(r.advance)}</td><td className="num">{money(r.penalty === null ? null : (r.penalty || 0) + (r.late_penalty || 0))}</td>

@@ -1,3 +1,4 @@
+import { User, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { useT } from "../i18n";
@@ -11,7 +12,7 @@ type Cfg = {
   settings: { roles: Record<string, Row>; people: Record<string, Row & { name: string }>; group_report_names: boolean };
 };
 
-/** Who sees what in the bot: in the HR group (👥) and in private chat (👤), per bot role with per-person exceptions. */
+/** Who sees what in the bot: in the HR group and in private chat, per bot role with per-person exceptions. */
 export function BotVisibility() {
   const t = useT();
   const cfg = useLoad<Cfg>("/api/bot-visibility");
@@ -30,15 +31,15 @@ export function BotVisibility() {
   const cells = (row: Row) => cats.map((c) => (
     <td key={c} style={{ whiteSpace: "nowrap", textAlign: "center" }}>
       <label title={t.l("Guruhda", "В группе", "In group")} style={{ marginRight: 6 }}>
-        <input type="checkbox" checked={row.group.includes(c)} onChange={() => toggle(row, "group", c)} /> 👥</label>
+        <input type="checkbox" checked={row.group.includes(c)} onChange={() => toggle(row, "group", c)} /> <Users className="ic inl" size={14} aria-hidden="true" /></label>
       <label title={t.l("Shaxsiy chatda", "В личке", "Private chat")}>
-        <input type="checkbox" checked={row.private.includes(c)} onChange={() => toggle(row, "private", c)} /> 👤</label>
+        <input type="checkbox" checked={row.private.includes(c)} onChange={() => toggle(row, "private", c)} /> <User className="ic inl" size={14} aria-hidden="true" /></label>
     </td>));
   return (
     <div className="card">
       <div className="card-h"><span className="card-t">{t.l("Botda kim nimani ko'radi", "Кто что видит в боте", "Who sees what in the bot")}</span>
-        <span className="card-s">{t.l("👥 HR guruhida · 👤 shaxsiy chatda. Belgi olib tashlansa, agent bu ma'lumotni o'sha joyda ko'rsatmaydi.",
-          "👥 в HR-группе · 👤 в личке. Без галочки агент не показывает эти данные там.", "👥 HR group · 👤 private chat.")}</span>
+        <span className="card-s">{t.l("HR guruhida · shaxsiy chatda. Belgi olib tashlansa, agent bu ma'lumotni o'sha joyda ko'rsatmaydi.",
+          "в HR-группе · в личке. Без галочки агент не показывает эти данные там.", "HR group · private chat.")}</span>
         <span className="card-a"><button className="btn sm primary" onClick={async () => {
           setErr(null);
           try { await api("/api/bot-visibility", { method: "PUT", body: s }); setMsg(t.l("Saqlandi", "Сохранено", "Saved")); cfg.reload(); }

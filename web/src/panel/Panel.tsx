@@ -24,6 +24,7 @@ import Materials from "./Materials";
 import Camera from "./Camera";
 import Discipline from "./Discipline";
 import { BotAccess, PendingUsers, UsersPage } from "./Users";
+import { Box } from "lucide-react";
 import { Ic } from "../icons";
 
 type Page = { key: string; sec: string; icon: string; perm: string | null; el: () => JSX.Element };
@@ -131,11 +132,7 @@ export default function Panel() {
       <div className="app">
         <aside className="side">
           <div className="brand">
-            <svg className="brand-cube" viewBox="0 0 34 34" aria-hidden="true">
-              <path d="M17 2 31 9.5v15L17 32 3 24.5v-15z" fill="var(--accent)" />
-              <path d="M17 2 31 9.5 17 17 3 9.5z" fill="#ff6aa6" opacity=".9" />
-              <path d="M17 17v15L3 24.5v-15z" fill="#a3134f" />
-            </svg>
+            <span className="brand-cube" aria-hidden="true"><Box size={20} strokeWidth={2} /></span>
             <span className="logo">{document.title.replace(/\s*HR$/i, "") || "HR"}</span>
           </div>
           <nav className="nav">

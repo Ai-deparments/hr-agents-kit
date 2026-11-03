@@ -1,3 +1,4 @@
+import { Phone } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api, auth, dash } from "../api";
 import { tEnum, useT } from "../i18n";
@@ -70,7 +71,7 @@ export default function RaufMini() {
                     <div className="muted">{c.breakdown[k].comment}</div></div>
                 ))}
                 {c.answers?.map((a: any, i: number) => <div key={i}><b>{a.q}</b><div>{a.a}</div></div>)}
-                {c.phone && <a href={`tel:${c.phone}`} className="btn sm">📞 {c.phone}</a>}
+                {c.phone && <a href={`tel:${c.phone}`} className="btn sm"><Phone className="ic inl" size={14} aria-hidden="true" /> {c.phone}</a>}
               </div>
             )}
             {c.status !== "hired" && c.status !== "rejected" && (

@@ -1,3 +1,4 @@
+import { CalendarDays, Check, ExternalLink, FileText, Link, Play } from "lucide-react";
 import { useContext, useMemo, useState } from "react";
 import { api, download } from "../api";
 import { LangCtx, useT } from "../i18n";
@@ -21,12 +22,12 @@ const T = {
     save: "Saqlash", send: "Yuborish", who: "Kimga yuboriladi", talk: "Suhbat", talkAt: "Suhbat vaqti", talkWith: "Kim o'tkazadi",
     msg: "Qo'shimcha xabar", sent: "yuborilgan", talks: "suhbat", done: "o'tkazildi", markDone: "O'tkazildi", noTg: "Telegram ulanmagan",
     pick: "Material tanlang", all: "Hammasi", dept: "Bo'lim", branch: "Filial", search: "Qidirish", result: "Navbatga qo'yildi",
-    without: "Telegram'siz (yuborilmadi)", history: "Kimga yuborilgan", selectAll: "Hammasini belgilash", talkHint: "suhbat belgilash uchun 🗓 ni bosing" },
+    without: "Telegram'siz (yuborilmadi)", history: "Kimga yuborilgan", selectAll: "Hammasini belgilash", talkHint: "suhbat belgilash uchun kalendar belgisini bosing" },
   ru: { add: "Новый материал", title: "Название", desc: "Описание / методика", file: "Видео или файл (≤ 49 МБ)", or: "или ссылка (https://…)",
     save: "Сохранить", send: "Отправить", who: "Кому отправить", talk: "Беседа", talkAt: "Время беседы", talkWith: "Кто проводит",
     msg: "Дополнительное сообщение", sent: "отправлено", talks: "бесед", done: "проведено", markDone: "Проведена", noTg: "Нет Telegram",
     pick: "Выберите материал", all: "Все", dept: "Отдел", branch: "Филиал", search: "Поиск", result: "В очереди",
-    without: "Без Telegram (не отправлено)", history: "Кому отправлено", selectAll: "Выбрать всех", talkHint: "нажмите 🗓, чтобы назначить беседу" },
+    without: "Без Telegram (не отправлено)", history: "Кому отправлено", selectAll: "Выбрать всех", talkHint: "нажмите значок календаря, чтобы назначить беседу" },
 };
 
 function Audience({ pos, dep, day, onPos, onDep, onDay }: { pos: number[]; dep: number[]; day: number;
@@ -124,7 +125,7 @@ function SendModal({ m, s, onClose, onDone }: { m: Mat; s: typeof T.ru; onClose:
                 <input type="checkbox" checked={picked.includes(e.id)} onChange={() => { setPicked(toggle(picked, e.id)); if (picked.includes(e.id)) setTalk(talk.filter((x) => x !== e.id)); }} />
                 <span style={{ flex: 1 }}><b>{e.full_name}</b><span>{[e.position, e.branch, e.department].filter(Boolean).join(" · ")}{e.telegram_linked ? "" : ` · ${s.noTg}`}</span></span>
                 <button type="button" className={`btn sm${talk.includes(e.id) ? " primary" : ""}`} disabled={!picked.includes(e.id)} title={s.talk}
-                  onClick={() => setTalk(toggle(talk, e.id))}>🗓 {s.talk}</button>
+                  onClick={() => setTalk(toggle(talk, e.id))}><CalendarDays className="ic inl" size={14} aria-hidden="true" /> {s.talk}</button>
               </div>
             ))}
             {list.length === 0 && <Empty />}
@@ -162,7 +163,7 @@ function Sends({ m, s }: { m: Mat; s: typeof T.ru }) {
             <tr key={x.id}>
               <td>{x.full_name}<span className="sub">{x.branch}{x.telegram ? "" : ` · ${s.noTg}`}</span></td>
               <td className="small">{dt(x.sent_at)}</td>
-              <td>{x.talk_at ? <span className="small">🗓 {dt(x.talk_at)} · {x.talk_with}</span> : <span className="muted">—</span>}</td>
+              <td>{x.talk_at ? <span className="small"><CalendarDays className="ic inl" size={14} aria-hidden="true" /> {dt(x.talk_at)} · {x.talk_with}</span> : <span className="muted">—</span>}</td>
               <td className="r">{x.talk_at && (x.talk_done ? <span className="badge b-ok">{s.done}</span>
                 : can(me, "onboarding") && <button className="btn sm" onClick={() => api(`/api/onboarding/materials/sends/${x.id}/talk-done`, { body: { note: "" } }).then(list.reload)}>{s.markDone}</button>)}</td>
             </tr>
@@ -255,7 +256,7 @@ function CoursePlanner() {
           <thead><tr><th>{t.l("Material", "Материал", "Material")}</th><th>{t.l("Reja", "План", "Plan")}</th><th>{t.l("Yuborildi", "Отправлено", "Sent")}</th><th>{t.l("Ko'rdi", "Посмотрел", "Viewed")}</th></tr></thead>
           <tbody>{prog.data.items.map((x) => (
             <tr key={x.id}><td>{x.title}{x.reason && <span className="sub">{x.reason}</span>}</td><td className="small">{x.scheduled_for || "—"}</td>
-              <td className="small">{fmt(x.sent_at)}</td><td>{x.viewed_at ? <span className="badge b-ok">✓ {fmt(x.viewed_at)}</span> : <span className="muted">—</span>}</td></tr>
+              <td className="small">{fmt(x.sent_at)}</td><td>{x.viewed_at ? <span className="badge b-ok"><Check className="ic inl" size={14} aria-hidden="true" /> {fmt(x.viewed_at)}</span> : <span className="muted">—</span>}</td></tr>
           ))}</tbody>
         </table>{!prog.data.telegram && <div className="error small" style={{ marginTop: 8 }}>{t.l("Telegram ulanmagan — yuborilmaydi", "Telegram не привязан — не отправится", "")}</div>}</div>
       )}
@@ -276,7 +277,7 @@ export default function Materials() {
   const aud = (m: Mat) => [...m.position_ids.map((i) => dicts.positions.find((p) => p.id === i)?.title),
     ...m.department_ids.map((i) => dicts.departments.find((d) => d.id === i)?.name)].filter(Boolean).join(", ");
   const write = can(me, "onboarding");
-  const icon = (k: string) => (k === "video" ? "▶" : k === "link" ? "🔗" : "📄");
+  const icon = (k: string) => (k === "video" ? <Play className="ic inl" size={14} aria-hidden="true" /> : k === "link" ? <Link className="ic inl" size={14} aria-hidden="true" /> : <FileText className="ic inl" size={14} aria-hidden="true" />);
   return (
     <div className="grid">
       {write && <div className="span-4"><NewMaterial s={s} onDone={mats.reload} /></div>}
@@ -291,10 +292,10 @@ export default function Materials() {
                 <tr key={m.id} className={sel?.id === m.id ? "sel" : ""} style={{ cursor: "pointer" }} onClick={() => setSel(m)}>
                   <td><span className="named"><span className="avatar">{icon(m.kind)}</span>
                     <span><b style={{ fontWeight: 600 }}>{m.title}</b><span className="sub">{aud(m) || (lang === "uz" ? "hamma uchun" : "для всех")} · {lang === "uz" ? "kun" : "день"} {m.day_offset}</span></span></span></td>
-                  <td className="r small">{m.sent} {s.sent} · {m.viewed} ✓<span className="sub">{m.planned} {lang === "uz" ? "rejada" : "в плане"}</span></td>
+                  <td className="r small">{m.sent} {s.sent} · {m.viewed} <Check className="ic inl" size={14} aria-hidden="true" /><span className="sub">{m.planned} {lang === "uz" ? "rejada" : "в плане"}</span></td>
                   <td className="r"><div className="row" style={{ justifyContent: "flex-end" }} onClick={(e) => e.stopPropagation()}>
                     {m.filename && <button className="btn sm" onClick={() => download(`/api/onboarding/materials/${m.id}/file`, m.filename!)}>↓</button>}
-                    {m.url && <a className="btn sm" href={m.url} target="_blank" rel="noopener noreferrer">↗</a>}
+                    {m.url && <a className="btn sm" href={m.url} target="_blank" rel="noopener noreferrer" aria-label="Open"><ExternalLink className="ic inl" size={14} aria-hidden="true" /></a>}
                     {write && <button className="btn sm" onClick={() => setTags(m)}>{lang === "uz" ? "Kim uchun" : "Для кого"}</button>}
                     {write && <button className="btn sm primary" onClick={() => setSendFor(m)}><Ic n="send" />{s.send}</button>}
                   </div></td>

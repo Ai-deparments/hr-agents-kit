@@ -1,3 +1,4 @@
+import { Check, ExternalLink } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { useT } from "../i18n";
@@ -104,7 +105,7 @@ export function VacancyEditor({ id, onClose, onChanged }: { id: number; onClose:
           <div className="row"><span className={`badge ${v.status === "open" ? "b-ok" : ""}`}>{v.status}</span>
             {v.public && <span className="badge b-info">{t.l("saytda", "на сайте", "on site")}</span>}
             {v.is_template && <span className="badge">{t.l("shablon", "шаблон", "template")}</span>}
-            {Object.keys(v.published).map((p) => <span key={p} className="badge b-ok">✓ {p}</span>)}</div>
+            {Object.keys(v.published).map((p) => <span key={p} className="badge b-ok"><Check className="ic inl" size={14} aria-hidden="true" /> {p}</span>)}</div>
           {v.missing.length > 0 && <div className="error small">{t.l("E'lon uchun to'ldiring", "Для публикации заполните", "Fill in")}: {v.missing.map((m) => missName[m] || m).join(", ")}</div>}
           <pre className="ad-preview">{v.ad_text}</pre>
           <AdStudio v={v} busy={busy} run={run} dirty={dirty} />
@@ -126,7 +127,7 @@ export function VacancyEditor({ id, onClose, onChanged }: { id: number; onClose:
             </div>
             <button className="btn primary" style={{ marginTop: 8 }} disabled={!!busy || v.missing.length > 0 || dirty}
               onClick={() => run("pub", api<Vac>(`/api/vacancies/${v.id}/publish`, { body: { web, channel } }))}>
-              ✅ {v.status === "open" ? t.l("Yangilab e'lon qilish", "Опубликовать ещё", "Publish more") : t.l("E'lon qilish", "Опубликовать", "Publish")}</button>
+              <Check className="ic inl" size={14} aria-hidden="true" /> {v.status === "open" ? t.l("Yangilab e'lon qilish", "Опубликовать ещё", "Publish more") : t.l("E'lon qilish", "Опубликовать", "Publish")}</button>
             {dirty && <div className="small muted" style={{ marginTop: 6 }}>{t.l("Avval saqlang", "Сначала сохраните", "Save first")}</div>}
           </div>}
           <div className="row">
@@ -134,7 +135,7 @@ export function VacancyEditor({ id, onClose, onChanged }: { id: number; onClose:
             <button className="btn sm" onClick={() => run("tpl", api<Vac>(`/api/vacancies/${v.id}/template`, { body: { is_template: !v.is_template } }))}>
               {v.is_template ? t.l("Shablondan olish", "Убрать из шаблонов", "Untemplate") : t.l("Shablonga saqlash", "В шаблоны", "Save as template")}</button>
             {v.status !== "closed" && <button className="btn sm danger" onClick={() => run("close", api<Vac>(`/api/vacancies/${v.id}/close`, { method: "POST" }))}>{t.l("Yopish", "Закрыть", "Close")}</button>}
-            {v.apply_url && v.status === "open" && <a className="btn sm" href={v.apply_url} target="_blank" rel="noopener noreferrer">↗ {t.l("Bot havolasi", "Ссылка бота", "Bot link")}</a>}
+            {v.apply_url && v.status === "open" && <a className="btn sm" href={v.apply_url} target="_blank" rel="noopener noreferrer"><ExternalLink className="ic inl" size={14} aria-hidden="true" /> {t.l("Bot havolasi", "Ссылка бота", "Bot link")}</a>}
           </div>
           <Err e={err} />
           {v.revisions && v.revisions.length > 0 && <details className="small">

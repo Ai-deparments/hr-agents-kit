@@ -22,6 +22,7 @@ h2 { font-size: 14px; font-weight: 600; margin: 0 0 12px; letter-spacing: -.005e
 /* ---------- shell (pitaka .app / .side / .nav-i / .hdr) ---------- */
 .side .brand .logo { width: auto; letter-spacing: .08em; white-space: nowrap; }
 .ic { flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.ic.inl { display: inline-block; vertical-align: -2px; }
 .nav-sec { padding: 14px 12px 4px; font-size: 12px; font-weight: 500; color: var(--muted); }
 .nav > div:first-child .nav-sec { padding-top: 0; }
 .side-foot { font-size: 13px; }

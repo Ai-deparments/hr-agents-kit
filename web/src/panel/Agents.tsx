@@ -28,7 +28,7 @@ export function AgentChat() {
       const r = await api<any>(`/api/agents/${agent}/chat`, { body: { text: q } });
       setMsgs((m) => ({ ...m, [agent]: [...(m[agent] || []), { role: "assistant", text: r.answer }] }));
     } catch (x: any) {
-      setMsgs((m) => ({ ...m, [agent]: [...(m[agent] || []), { role: "assistant", text: "⚠️ " + x.message }] }));
+      setMsgs((m) => ({ ...m, [agent]: [...(m[agent] || []), { role: "assistant", text: x.message }] }));
     } finally { setBusy(false); }
   };
 

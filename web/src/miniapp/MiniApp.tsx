@@ -1,3 +1,4 @@
+import { Lock, TriangleAlert } from "lucide-react";
 import QRCode from "qrcode";
 import { useEffect, useState } from "react";
 import { api, auth, money, monthISO, shiftDay, todayISO } from "../api";
@@ -162,7 +163,7 @@ function MeView({ me, reload }: { me: any; reload: () => void }) {
   const send = (body: any) => api<any>("/api/miniapp/check", { body, mini: true });
   const done = (kind: string, r: any) => {
     tg()?.HapticFeedback?.notificationOccurred("success");
-    setToast(`${kind === "in" ? t("checkIn") : t("checkOut")} · ${String(r.ts).slice(11, 16)}${r.verified === "qr" ? " · QR ✓" : r.verified === "geo" ? " · 📍 ✓" : ""}`);
+    setToast(`${kind === "in" ? t("checkIn") : t("checkOut")} · ${String(r.ts).slice(11, 16)}${r.verified === "qr" ? " · QR" : r.verified === "geo" ? " · GPS" : ""}`);
     setNeedCode(null); setCode("");
     reload();
   };
@@ -208,7 +209,7 @@ function MeView({ me, reload }: { me: any; reload: () => void }) {
           style={{ fontSize: 28, textAlign: "center", letterSpacing: 8, fontFamily: "var(--mono)" }} autoFocus />
         <button className="btn primary" disabled={busy || code.length !== 6}>OK</button>
       </form>}
-      {cfg && cfg.mode !== "none" && <div className="muted small">🔒 {cfg.mode === "qr" ? "QR" : cfg.mode === "geo" ? "📍 GPS" : "📍 GPS / QR"} — {t("ma_verified")}</div>}
+      {cfg && cfg.mode !== "none" && <div className="muted small"><Lock className="ic inl" size={14} aria-hidden="true" /> {cfg.mode === "qr" ? "QR" : cfg.mode === "geo" ? "GPS" : "GPS / QR"} — {t("ma_verified")}</div>}
       {me.open_shift_from_yesterday && <div className="note">{t("ma_openShift").replace("{b}", t("checkOut"))}</div>}
       <div className="card stack" style={{ gap: 6 }}>
         <div className="row"><b>{t("today")}</b><span className="spacer" /><Status s={d.status} /></div>
@@ -273,7 +274,7 @@ function LeadReport() {
       setState((s) => ({ ...s, [r.employee_id]: t("saved") }));
       load();
     } catch (x: any) {
-      setState((s) => ({ ...s, [r.employee_id]: "⚠ " + (x.status === 409 ? t("ma_conflict409") : x.message) }));
+      setState((s) => ({ ...s, [r.employee_id]: (x.status === 409 ? t("ma_conflict409") : x.message) }));
     }
   };
   const rows = (data?.rows || []).filter((r: any) => !q || r.full_name.toLowerCase().includes(q.toLowerCase()));
@@ -307,7 +308,7 @@ function LeadReport() {
               <div style={{ flex: 1 }}>
                 <b>{r.full_name}</b>
                 <div className="muted small">{r.position}{r.check_in ? ` · ${t("ma_inAt")} ${r.check_in.slice(11)}` : ` · ${t("ma_noSelf")}`}
-                  {r.late_min ? ` · ${t("st_late")} ${r.late_min}${t("c_mUnit")}` : ""}{r.warnings_month ? ` · ⚠ ${r.warnings_month} ${t("ma_warnings")}` : ""}</div>
+                  {r.late_min ? ` · ${t("st_late")} ${r.late_min}${t("c_mUnit")}` : ""}{r.warnings_month ? <> · <TriangleAlert className="ic inl" size={13} aria-hidden="true" /> {r.warnings_month} {t("ma_warnings")}</> : ""}</div>
               </div>
               <Status s={r.status} />
             </div>
@@ -376,7 +377,7 @@ function LeadMonth() {
         <button key={r.employee_id} className="person" style={{ textAlign: "left", cursor: "pointer" }} onClick={() => setPerson(r)}>
           <div className="top"><div style={{ flex: 1 }}><b>{r.full_name}</b><div className="muted small">{r.position} · {r.worked_hours}/{r.norm_hours} {t("c_hUnit")}</div></div>
             <div className="num" style={{ fontWeight: 800 }}>{money(r.total)}</div></div>
-          <div className="row small muted">{t("advance")} {money(r.advance)} · {t("penalty")} {money(r.penalty)}{r.warnings ? ` · ⚠ ${r.warnings}` : ""}</div>
+          <div className="row small muted">{t("advance")} {money(r.advance)} · {t("penalty")} {money(r.penalty)}{r.warnings ? <> · <TriangleAlert className="ic inl" size={13} aria-hidden="true" /> {r.warnings}</> : ""}</div>
         </button>
       ))}
     </div>

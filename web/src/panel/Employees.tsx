@@ -1,3 +1,4 @@
+import { Check, Square, SquareCheckBig } from "lucide-react";
 import { useState } from "react";
 import { api, dash, money } from "../api";
 import { tEnum, useT } from "../i18n";
@@ -45,7 +46,7 @@ export default function Employees() {
                   <td>{dash(e.position)}</td><td>{dash(e.branch)}</td><td><Status s={e.status} /></td>
                   <td className="mono small">{dash(e.hire_date)}</td><td className="small">{tEnum(t, "pt_", e.pay_type)} · {e.schedule_code}</td>
                   {me.payroll && <td className="num">{money(e.base_salary)}</td>}
-                  <td>{e.telegram_linked ? "✓" : <span className="muted">—</span>}</td>
+                  <td>{e.telegram_linked ? <Check className="ic inl" size={14} aria-hidden="true" /> : <span className="muted">—</span>}</td>
                 </tr>
               ))}
             </tbody>
@@ -118,7 +119,7 @@ function EmployeeDrawer({ id, onClose, onChanged }: { id: number; onClose: () =>
             {e.onboarding ? (
               <div className="stack">
                 <div className="row"><Light c={e.onboarding.light} /><b>{t("c_day")} {e.onboarding.day}</b> · {t("c_stage")} {e.onboarding.stage} · {e.onboarding.progress_pct}% · {t("c_mentor")} {dash(e.onboarding.mentor)}</div>
-                {e.onboarding.items.map((i: any) => <div key={i.id} className="small">{i.done ? "✅" : "⬜"} [{i.stage}] {i.title}</div>)}
+                {e.onboarding.items.map((i: any) => <div key={i.id} className="small">{i.done ? <SquareCheckBig className="ic inl" size={14} aria-hidden="true" /> : <Square className="ic inl" size={14} aria-hidden="true" />} [{i.stage}] {i.title}</div>)}
               </div>
             ) : <span className="muted">{t("em_noPlan")}</span>}
           </div>
@@ -165,7 +166,7 @@ function BranchLeads() {
       <div className="table-wrap"><table>
         <thead><tr><th>{t("c_branch")}</th><th>{t("em_lead")}</th><th>Telegram</th><th /></tr></thead>
         <tbody>{data?.map((l) => (
-          <tr key={l.id}><td>{name(l.branch_id)}</td><td>{l.full_name}</td><td>{l.telegram_linked ? `✓ ${t("c_linked")}` : <span className="muted">{t("c_notLinked")}</span>}</td>
+          <tr key={l.id}><td>{name(l.branch_id)}</td><td>{l.full_name}</td><td>{l.telegram_linked ? <><Check className="ic inl" size={14} aria-hidden="true" /> {t("c_linked")}</> : <span className="muted">{t("c_notLinked")}</span>}</td>
             <td>{editable && <button className="btn sm danger" onClick={async () => { await api(`/api/branch-leads/${l.id}`, { method: "DELETE" }); reload(); }}>{t("em_remove")}</button>}</td></tr>
         ))}</tbody>
       </table></div>

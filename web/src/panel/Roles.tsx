@@ -1,3 +1,4 @@
+import { Check } from "lucide-react";
 import { useState } from "react";
 import { BotVisibility } from "./BotVisibility";
 import { api, dash } from "../api";
@@ -133,7 +134,7 @@ export default function Roles() {
           <thead><tr><th>{t("username")}</th><th>{t.l("Ism-familiya", "ФИО", "Full name")}</th><th>{t.l("Rol", "Роль", "Role")}</th><th>{t("branches")}</th><th>{t.l("Oylik", "ЗП", "Salary")}</th><th>{t.l("Holat", "Статус", "Status")}</th><th></th></tr></thead>
           <tbody>{(users.data || []).map((u) => (
             <tr key={u.id}><td>{u.username}</td><td>{dash(u.full_name)}</td><td>{roleName(u.role)}</td><td className="small">{branchNames(u.branch_scope)}</td>
-              <td>{u.can_see_payroll ? "✓" : "—"}</td><td><span className={`badge ${u.active ? "b-ok" : ""}`}>{u.active ? t.l("faol", "активен", "active") : t.l("o'chiq", "отключён", "disabled")}</span></td>
+              <td>{u.can_see_payroll ? <Check className="ic inl" size={14} aria-hidden="true" /> : "—"}</td><td><span className={`badge ${u.active ? "b-ok" : ""}`}>{u.active ? t.l("faol", "активен", "active") : t.l("o'chiq", "отключён", "disabled")}</span></td>
               <td className="num"><button className="btn sm" disabled={!roles.data} onClick={() => setUser(u)}>{t("edit")}</button></td></tr>
           ))}</tbody>
         </table>{users.data?.length === 0 && <Empty />}</div>

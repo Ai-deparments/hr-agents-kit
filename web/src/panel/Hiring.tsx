@@ -1,3 +1,4 @@
+import { CalendarDays, FileText } from "lucide-react";
 import { useState } from "react";
 import { api, dash } from "../api";
 import { useT } from "../i18n";
@@ -117,15 +118,23 @@ export function CandidateHiring({ cand, write, onChanged }: { cand: any; write: 
     <div className="stack" style={{ borderTop: "1px solid var(--border)", paddingTop: 10 }}>
       <b>{t.l("Yollash bosqichlari", "Этапы найма", "Hiring steps")}</b>
       {!d.telegram && <div className="note">{t.l("Nomzodning Telegram'i yo'q — bot orqali yuborib bo'lmaydi.", "У кандидата нет Telegram — через бота не отправить.", "No Telegram — can't send via the bot.")}</div>}
-      {d.interview && <div className="small">🗓 {t.l("Suhbat", "Собеседование", "Interview")}: <b>{fmt(d.interview.starts_at)}</b> {d.interview.place && `· ${d.interview.place}`}</div>}
+      {d.interview && <div className="small"><CalendarDays className="ic inl" size={14} aria-hidden="true" /> {t.l("Suhbat", "Собеседование", "Interview")}: <b>{fmt(d.interview.starts_at)}</b> {d.interview.place && `· ${d.interview.place}`}</div>}
       {d.steps.map((s: any) => <div key={s.id} className="row small"><span>{STEP[s.kind] || s.kind}</span><span className="spacer" />
         <span className={`badge ${s.status === "done" ? "b-ok" : s.status === "open" ? "b-warn" : "b-bad"}`}>{STATE[s.status] || s.status}</span>
         <span className="muted">{fmt(s.created_at)}</span></div>)}
       {msg && <div className="note">{msg}</div>}
       <Err e={err} />
       {write && d.telegram && cand.status !== "hired" && !offer && <div className="row">
+<<<<<<< HEAD
         <button className="btn" onClick={() => setInviting(true)}>🗓 {t.l("Suhbatga taklif", "Пригласить на собеседование", "Invite to interview")}</button>
         <button className="btn primary" onClick={() => setOffer(true)}>📄 {t.l("Ish taklifi", "Отправить оффер", "Send offer")}</button>
+=======
+        <button className="btn" onClick={async () => {
+          try { const r = await api<any>(`/api/candidates/${cand.id}/invite`, { body: {} }); setMsg(t.l(`Yuborildi: ${r.offered} ta vaqt`, `Отправлено: ${r.offered} слотов`, `Sent ${r.offered} slots`)); st.reload(); }
+          catch (x: any) { setErr(x.message); }
+        }}><CalendarDays className="ic inl" size={14} aria-hidden="true" /> {t.l("Suhbatga taklif", "Пригласить на собеседование", "Invite to interview")}</button>
+        <button className="btn primary" onClick={() => setOffer(true)}><FileText className="ic inl" size={14} aria-hidden="true" /> {t.l("Ish taklifi", "Отправить оффер", "Send offer")}</button>
+>>>>>>> 13bd074 (feat(web): lucide-react icons and react-bits CountUp instead of hand-drawn icons and emoji)
       </div>}
       {offer && <form className="form" onSubmit={async (e) => {
         e.preventDefault();

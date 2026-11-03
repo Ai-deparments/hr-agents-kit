@@ -1,3 +1,4 @@
+import { Check } from "lucide-react";
 import { useState } from "react";
 import { api, dash, download } from "../api";
 import { useT } from "../i18n";
@@ -25,7 +26,7 @@ export function HrDocs() {
           <th>{t.l("Bo'sh maydonlar", "Пустые поля", "Blank fields")}</th><th>{t.l("Sana", "Дата", "Date")}</th><th /></tr></thead>
         <tbody>{docs.data?.map((d) => (
           <tr key={d.id}><td className="num"><b>{d.number}</b></td><td>{d.title}</td><td>{dash(d.employee)}</td>
-            <td className="small">{d.missing.length ? <span className="badge b-warn">{d.missing.join(", ")}</span> : <span className="badge b-ok">✓</span>}</td>
+            <td className="small">{d.missing.length ? <span className="badge b-warn">{d.missing.join(", ")}</span> : <span className="badge b-ok"><Check className="ic inl" size={14} aria-hidden="true" /></span>}</td>
             <td className="small">{new Date(d.created_at).toLocaleDateString("ru-RU")}</td>
             <td><button className="btn sm" onClick={() => download(`/api/hr-docs/${d.id}/pdf`, `${d.number}.pdf`).catch((x) => setErr(x.message))}>⤓ PDF</button></td></tr>
         ))}</tbody>

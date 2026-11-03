@@ -76,7 +76,7 @@ function Approve({ reg, catalog, onClose, onDone }: { reg: Reg; catalog: Catalog
             <select value={employeeId} onChange={(e) => setEmployeeId(Number(e.target.value) || "")}>
               <option value="">—</option>
               {(emps.data || []).map((e) => <option key={e.id} value={e.id} disabled={e.telegram_linked}>
-                {e.full_name} · {dash(e.branch)}{e.telegram_linked ? " · TG ✓" : ""}</option>)}
+                {e.full_name} · {dash(e.branch)}{e.telegram_linked ? " · TG" : ""}</option>)}
             </select>
           </>
         ) : (

@@ -1,3 +1,4 @@
+import { PenLine } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "./api";
 
@@ -30,7 +31,7 @@ export default function Jobs() {
         <article className="card job-full">
           <a className="lnk" href="#" onClick={(e) => { e.preventDefault(); location.hash = ""; }}>← Barcha vakansiyalar · Все вакансии</a>
           <pre className="ad-preview">{job.text}</pre>
-          {job.apply_url && <a className="btn primary big" href={job.apply_url} target="_blank" rel="noopener noreferrer">✍️ Ariza topshirish · Откликнуться</a>}
+          {job.apply_url && <a className="btn primary big" href={job.apply_url} target="_blank" rel="noopener noreferrer"><PenLine className="ic inl" size={16} aria-hidden="true" /> Ariza topshirish · Откликнуться</a>}
         </article>
       ) : (
         <div className="jobs-list">

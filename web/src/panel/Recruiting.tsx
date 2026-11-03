@@ -1,3 +1,4 @@
+import { ExternalLink, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { api, dash } from "../api";
 import { tEnum, useT } from "../i18n";
@@ -31,14 +32,14 @@ export default function Recruiting() {
       <Err e={err || vac.error || cands.error} />
       <div className="card">
         <div className="row" style={{ marginBottom: 10 }}><h2 style={{ margin: 0 }}>{t("rc_vacancies")}</h2><span className="spacer" />
-          {!location.pathname.startsWith("/rauf") && <a className="btn" href="/rauf">{t("rc_raufPanel")}</a>}
+          {!location.pathname.startsWith("/rauf") && <a className="btn" href="/rauf">{t("rc_raufPanel")} <ExternalLink className="ic inl" size={14} aria-hidden="true" /></a>}
           <select className="ctl" value={filter} onChange={(e) => setFilter(e.target.value)}>
             <option value="active">{t.l("Qoralama + ochiq", "Черновики + открытые", "Drafts + open")}</option>
             <option value="open">{t.l("Ochiq", "Открытые", "Open")}</option><option value="draft">{t.l("Qoralama", "Черновики", "Drafts")}</option>
             <option value="closed">{t.l("Yopilgan", "Закрытые", "Closed")}</option><option value="tpl">{t.l("Shablonlar", "Шаблоны", "Templates")}</option>
             <option value="all">{t("all")}</option></select>
           {write && <button className="btn" onClick={() => setDrafting(true)}>{t("rc_draftBtn")}</button>}
-          {write && <button className="btn primary" onClick={() => setAiNew(true)}>✨ {t.l("Agent bilan yozish", "Написать с агентом", "Write with agent")}</button>}</div>
+          {write && <button className="btn primary" onClick={() => setAiNew(true)}><Sparkles className="ic inl" size={14} aria-hidden="true" /> {t.l("Agent bilan yozish", "Написать с агентом", "Write with agent")}</button>}</div>
         <div className="table-wrap"><table>
           <thead><tr><th /><th>{t("c_title")}</th><th>{t("c_branch")}</th><th>{t("c_salary")}</th><th>{t("c_schedule")}</th><th>{t("c_status")}</th><th className="num">SLA</th><th /></tr></thead>
           <tbody>{vac.data?.filter((v) => filter === "all" || (filter === "tpl" ? v.is_template : filter === "active" ? v.status !== "closed" : v.status === filter)).map((v) => (

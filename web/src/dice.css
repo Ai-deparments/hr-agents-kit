@@ -79,7 +79,7 @@ body::before { display: none; }
 .side { position: sticky; top: 0; height: 100dvh; margin: 0; padding: 18px 0 14px; border: 0; border-right: 1px solid var(--border);
   border-radius: 0; background: var(--side-bg); box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
 .brand { flex-direction: row; align-items: center; gap: 10px; padding: 0 18px 20px; }
-.brand-cube { width: 34px; height: 34px; flex: none; }
+.brand-cube { width: 34px; height: 34px; flex: none; display: grid; place-items: center; border-radius: 9px; background: var(--accent); color: #fff; }
 .side .brand .logo { width: auto; height: auto; font-size: 22px; font-weight: 700; letter-spacing: -.01em; line-height: 1; }
 .brand span:not(.logo) { display: none; }
 .nav { padding: 0 12px; }
