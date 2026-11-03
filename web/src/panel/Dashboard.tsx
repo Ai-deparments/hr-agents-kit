@@ -1,4 +1,5 @@
-import { useContext } from "react";
+import { useContext, useState } from "react";
+import { AlarmClock, ArrowRight, Briefcase, Building2, ChevronDown, ChevronUp, ListChecks, MapPin, UserX, Users } from "lucide-react";
 import { LangCtx } from "../i18n";
 import { Ic } from "../icons";
 import { AnimatedValue } from "../components/AnimatedValue";
@@ -25,12 +26,14 @@ const L = {
     mln: "mln", base: "asosiy oyliklar", regs: "Botdan arizalar", cand: "yangi nomzod", att: "Davomat", att14: "so'nggi 14 kun",
     came: "Keldi", plan: "Reja", late: "Kechikdi", early: "30 kunda ketgan", left: "3 oyda ketgan", branches: "Filiallar",
     vacs: "Ochiq vakansiyalar", activity: "Faoliyat", onb: "Onboarding", inPlan: "Rejada", behind: "Ortda", noMentor: "Mentorsiz",
-    upd: "Yangilandi", today: "bugun", share: "ulush", docs: "hujjat muddati tugaydi", req: "so'rov kutmoqda", depts: "Bo'limlar", people: "xodim" },
+    upd: "Yangilandi", today: "bugun", share: "ulush", docs: "hujjat muddati tugaydi", req: "so'rov kutmoqda", depts: "Bo'limlar", people: "xodim", noDept: "Bo'limsiz", more: "Yana", less: "Yig'ish", all: "Hammasi",
+    nCand: "nomzod", days: "kun" },
   ru: { active: "Активные сотрудники", probation: "на испытательном", shift: "На смене сегодня", notMarked: "не отметились", fund: "Фонд оплаты",
     mln: "млн", base: "базовые оклады", regs: "Заявки из бота", cand: "новых кандидатов", att: "Посещаемость", att14: "последние 14 дней",
     came: "Пришли", plan: "План", late: "Опоздали", early: "ушли в первые 30 дней", left: "уволились за 3 мес.", branches: "Филиалы",
     vacs: "Открытые вакансии", activity: "Активность", onb: "Онбординг", inPlan: "В плане", behind: "Отстают", noMentor: "Без наставника",
-    upd: "Обновлено", today: "сегодня", share: "доля", docs: "документов истекает", req: "заявлений ждут", depts: "Отделы", people: "сотр." },
+    upd: "Обновлено", today: "сегодня", share: "доля", docs: "документов истекает", req: "заявлений ждут", depts: "Отделы", people: "сотр.", noDept: "Без отдела", more: "Ещё", less: "Свернуть", all: "Все",
+    nCand: "канд.", days: "дн." },
 };
 
 /** Bars = came, smooth area = planned. Pure SVG, colours from CSS. */
@@ -83,6 +86,35 @@ function Kpi({ label, value, unit, chip, delta, cmp, icon, hero }: {
   );
 }
 
+type Row = { key: string; name: string; tag?: string; value: number; icon: typeof MapPin };
+
+/** Ranked bars, biggest first; long lists fold after `top` rows. */
+function RankList({ rows, top, s }: { rows: Row[]; top: number; s: (typeof L)["uz"] }) {
+  const [open, setOpen] = useState(false);
+  const sorted = [...rows].sort((a, b) => b.value - a.value);
+  const max = Math.max(1, ...sorted.map((r) => r.value));
+  const shown = open ? sorted : sorted.slice(0, top);
+  return (
+    <>
+      <ul className="rank rank-i">
+        {shown.map(({ key, name, tag, value, icon: I }) => (
+          <li key={key}>
+            <span className="named"><I className="ic" size={15} aria-hidden="true" /><span className="nm">{name}</span>
+              {tag && <span className="tag">{tag}</span>}</span>
+            <span className="bar"><i style={{ width: `${(100 * value) / max}%` }} /></span><span className="v">{value}</span>
+          </li>
+        ))}
+      </ul>
+      {sorted.length > top && (
+        <button className="lnk lnk-i fold" onClick={() => setOpen(!open)}>
+          {open ? <>{s.less}<ChevronUp size={14} aria-hidden="true" /></>
+            : <>{s.more} {sorted.length - top}<ChevronDown size={14} aria-hidden="true" /></>}
+        </button>
+      )}
+    </>
+  );
+}
+
 export default function Dashboard() {
   const { lang } = useContext(LangCtx);
   const s = lang === "uz" ? L.uz : L.ru;
@@ -97,7 +129,6 @@ export default function Dashboard() {
   const now = new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
   const last7 = d.days.slice(-7);
   const sum = (k: keyof Day, arr: Day[]) => arr.reduce((a, x) => a + (x[k] as number), 0);
-  const maxB = Math.max(1, ...d.branches.map((b) => b.people));
   const ago = (ts: string) => {
     const m = Math.round((Date.now() - new Date(ts).getTime()) / 60000);
     return m < 60 ? `${m} min` : m < 1440 ? `${Math.round(m / 60)} h` : `${Math.round(m / 1440)} d`;
@@ -119,7 +150,7 @@ export default function Dashboard() {
 
       <section className="card">
         <div className="card-h"><span className="card-t">{s.att}</span><span className="card-s">{s.att14}</span>
-          <span className="card-a"><button className="lnk" onClick={() => go("attendance")}>→</button></span></div>
+          <span className="card-a"><button className="lnk lnk-i" onClick={() => go("attendance")}>{s.all}<ArrowRight size={14} aria-hidden="true" /></button></span></div>
         <div className="row att-stats" style={{ gap: "18px 48px", marginBottom: 8 }}>
           {[
             [sum("came", last7), s.came, pct(sum("came", last7), sum("scheduled", last7))],
@@ -141,35 +172,37 @@ export default function Dashboard() {
 
       <div className="grid">
         <section className="span-4 card">
-          <div className="card-h"><span className="card-t">{s.branches}</span></div>
-          <ol className="rank">
-            {d.branches.map((b, i) => (
-              <li key={b.branch}><span className="n">{i + 1}</span>
-                <span className="named"><span className="mk">{b.branch.replace(/[^A-Za-zА-Яа-я0-9]/g, "").slice(0, 2).toUpperCase()}</span>{b.branch}</span>
-                <span className="bar"><i style={{ width: `${(100 * b.people) / maxB}%` }} /></span><span className="v">{b.people}</span></li>
-            ))}
-          </ol>
-          <dl className="kv" style={{ marginTop: 12 }}>
-            {Object.entries(d.departments).map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
-          </dl>
+          <div className="card-h"><span className="card-t">{s.branches}</span>
+            <span className="card-s">{d.branches.reduce((a, b) => a + b.people, 0)} {s.people}</span></div>
+          <RankList s={s} top={6} rows={d.branches.map((b) => {
+            const [name, tag] = b.branch.split(" · ");
+            return { key: b.branch, name, tag, value: b.people, icon: tag ? MapPin : Building2 };
+          })} />
+          <div className="card-h dash-sub"><span className="card-t">{s.depts}</span></div>
+          <RankList s={s} top={5} rows={Object.entries(d.departments).map(([k, v]) => (
+            { key: k, name: k === "—" ? s.noDept : k, value: v, icon: Users }))} />
         </section>
 
         <section className="span-4 card">
           <div className="card-h"><span className="card-t">{s.vacs}</span>
-            <span className="card-a"><button className="lnk" onClick={() => go("recruiting")}>→</button></span></div>
+            <span className="card-a"><button className="lnk lnk-i" onClick={() => go("recruiting")}>{s.all}<ArrowRight size={14} aria-hidden="true" /></button></span></div>
           {d.vacancies.length === 0 ? <Empty /> : d.vacancies.map((v) => (
-            <div key={v.id} className="named" style={{ display: "flex", padding: "10px 0", borderBottom: "1px solid var(--grid)" }}>
-              <span className="avatar">{v.title.slice(0, 2).toUpperCase()}</span>
-              <span style={{ flex: 1, minWidth: 0 }}><b style={{ fontWeight: 600 }}>{v.title}</b>
-                <span className="small muted" style={{ display: "block" }}>{v.branch} · {v.candidates} cand.</span></span>
-              <span className={`badge ${v.light === "red" ? "b-bad" : v.light === "yellow" ? "b-warn" : "b-ok"}`}>{v.days_open}/{v.sla_days} d</span>
+            <div key={v.id} className="vac-row">
+              <span className="ico-tile"><Briefcase size={16} aria-hidden="true" /></span>
+              <span className="vac-main"><b>{v.title}</b>
+                <span className="small muted">{[v.branch, `${v.candidates} ${s.nCand}`].filter(Boolean).join(" · ")}</span></span>
+              <span className={`badge ${v.light === "red" ? "b-bad" : v.light === "yellow" ? "b-warn" : "b-ok"}`}
+                title="SLA">{v.days_open} / {v.sla_days} {s.days}</span>
             </div>
           ))}
-          <dl className="kv" style={{ marginTop: 14 }}>
-            <div><dt>{s.onb}: {s.inPlan}</dt><dd>{d.onboarding.total}</dd></div>
-            <div><dt>{s.behind}</dt><dd className={d.onboarding.behind ? "t-bad" : ""}>{d.onboarding.behind}</dd></div>
-            <div><dt>{s.noMentor}</dt><dd>{d.onboarding.no_mentor}</dd></div>
-          </dl>
+          <div className="card-h dash-sub"><span className="card-t">{s.onb}</span></div>
+          <div className="mini-stats">
+            {([[ListChecks, s.inPlan, d.onboarding.total, ""],
+               [AlarmClock, s.behind, d.onboarding.behind, d.onboarding.behind ? "t-bad" : ""],
+               [UserX, s.noMentor, d.onboarding.no_mentor, ""]] as const).map(([I, label, v, cls]) => (
+              <div key={label} className="mini-stat"><I size={16} aria-hidden="true" /><b className={cls}>{v}</b><span>{label}</span></div>
+            ))}
+          </div>
         </section>
 
         <section className="span-4 card">

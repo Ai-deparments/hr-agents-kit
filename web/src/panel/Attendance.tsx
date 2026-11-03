@@ -1,3 +1,4 @@
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { api, dash, download, monthISO, shiftDay, todayISO } from "../api";
 import { tEnum, useT } from "../i18n";
@@ -29,9 +30,9 @@ export function Attendance() {
       {can(me, "broadcast") && <Nudges />}
       {can(me, "attendance.write") && <LatenessRule />}
       <div className="row">
-        <button className="btn sm" onClick={() => setDay(shiftDay(day, -1))}>←</button>
+        <button className="btn sm" onClick={() => setDay(shiftDay(day, -1))} aria-label="Previous day"><ChevronLeft size={16} aria-hidden="true" /></button>
         <input type="date" value={day} onChange={(e) => setDay(e.target.value)} />
-        <button className="btn sm" onClick={() => setDay(shiftDay(day, 1))}>→</button>
+        <button className="btn sm" onClick={() => setDay(shiftDay(day, 1))} aria-label="Next day"><ChevronRight size={16} aria-hidden="true" /></button>
         <BranchSelect value={branch} onChange={setBranch} />
       </div>
       <Err e={error} />
