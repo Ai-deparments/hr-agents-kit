@@ -1,4 +1,4 @@
-import { useContext, useState } from "react";
+import { lazy, Suspense, useContext, useState } from "react";
 import { AlarmClock, ArrowRight, Briefcase, Building2, ChevronDown, ChevronUp, ListChecks, MapPin, UserX, Users } from "lucide-react";
 import { LangCtx } from "../i18n";
 import { Ic } from "../icons";
@@ -19,6 +19,8 @@ type D = {
   vacancies: { id: number; title: string; branch: string | null; days_open: number; sla_days: number; light: string; candidates: number }[];
   days: Day[];
 };
+const AttendanceChart = lazy(() => import("../components/charts").then((m) => ({ default: m.AttendanceChart })));
+
 type Audit = { id: number; ts: string; actor: string; action: string; target: string | null };
 
 const L = {
@@ -35,42 +37,6 @@ const L = {
     upd: "Обновлено", today: "сегодня", share: "доля", docs: "документов истекает", req: "заявлений ждут", depts: "Отделы", people: "сотр.", noDept: "Без отдела", more: "Ещё", less: "Свернуть", all: "Все",
     nCand: "канд.", days: "дн." },
 };
-
-/** Bars = came, smooth area = planned. Pure SVG, colours from CSS. */
-function Combo({ days, lang }: { days: Day[]; lang: string }) {
-  const W = 1000, H = 240, pl = 34, pb = 26, pt = 10;
-  const max = Math.max(1, ...days.map((d) => Math.max(d.came, d.scheduled)));
-  const top = Math.ceil(max / 5) * 5 || 5;
-  const step = (W - pl) / days.length;
-  const x = (i: number) => pl + step * i + step / 2;
-  const y = (v: number) => pt + (H - pt - pb) * (1 - v / top);
-  const pts = days.map((d, i) => [x(i), y(d.scheduled)]);
-  let path = `M${pts[0][0]},${pts[0][1]}`;
-  for (let i = 0; i < pts.length - 1; i++) {  // Catmull-Rom -> cubic Bézier
-    const [p0, p1, p2, p3] = [pts[i - 1] || pts[i], pts[i], pts[i + 1], pts[i + 2] || pts[i + 1]];
-    path += ` C${p1[0] + (p2[0] - p0[0]) / 6},${p1[1] + (p2[1] - p0[1]) / 6} ${p2[0] - (p3[0] - p1[0]) / 6},${p2[1] - (p3[1] - p1[1]) / 6} ${p2[0]},${p2[1]}`;
-  }
-  const area = `${path} L${pts[pts.length - 1][0]},${y(0)} L${pts[0][0]},${y(0)} Z`;
-  const bw = Math.min(34, step * 0.5);
-  const fmt = (iso: string) => new Date(iso + "T12:00:00").toLocaleDateString(lang === "en" ? "en-GB" : "ru-RU", { day: "2-digit", month: "2-digit" });
-  return (
-    <svg className="combo" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label="attendance">
-      {[0, 0.25, 0.5, 0.75, 1].map((f) => (
-        <g key={f}><line className="gl" x1={pl} x2={W} y1={y(top * f)} y2={y(top * f)} />
-          <text x={pl - 8} y={y(top * f) + 4} textAnchor="end">{Math.round(top * f)}</text></g>
-      ))}
-      {days.map((_, i) => <line key={i} className="gl" x1={x(i)} x2={x(i)} y1={pt} y2={y(0)} />)}
-      <path className="area" d={area} />
-      {days.map((d, i) => (
-        <g key={d.day}>
-          <rect className="b" x={x(i) - bw / 2} y={y(d.came)} width={bw} height={Math.max(0, y(0) - y(d.came))} rx={2}>
-            <title>{`${fmt(d.day)}: ${d.came} / ${d.scheduled}`}</title></rect>
-          <text x={x(i)} y={H - 6} textAnchor="middle">{fmt(d.day)}</text>
-        </g>
-      ))}
-    </svg>
-  );
-}
 
 function Kpi({ label, value, unit, chip, delta, cmp, icon, hero }: {
   label: string; value: string | number; unit?: string; chip?: string; delta?: string; cmp?: string; icon: string; hero?: boolean;
@@ -165,9 +131,11 @@ export default function Dashboard() {
             </div>
           ))}
         </div>
-        <Combo days={d.days} lang={lang} />
-        <div className="legend-dots"><span><i style={{ ["--c" as any]: "var(--accent)" }} />{s.came}</span>
-          <span><i style={{ ["--c" as any]: "var(--data-2)" }} />{s.plan}</span></div>
+        <Suspense fallback={<div className="viz" />}>
+          <AttendanceChart days={d.days} lang={lang} labels={{ came: s.came, plan: s.plan, late: s.late }} />
+        </Suspense>
+        <div className="legend-dots"><span><i style={{ ["--c" as any]: "var(--viz-1)" }} />{s.came}</span>
+          <span><i style={{ ["--c" as any]: "var(--viz-2)" }} />{s.plan}</span></div>
       </section>
 
       <div className="grid">

@@ -2,6 +2,7 @@
    accent-filled active nav, ghost line icons in KPI cards, accent hero card. Dark by default, light via data-theme. */
 :root, :root[data-theme="dark"] {
   color-scheme: dark;
+  --viz-1: #d6246e; --viz-2: #3987e5; --abc-a: #f29bbd; --abc-b: #d6246e; --abc-c: #a3305f;
   --font: "Nunito Sans", "Geist", ui-sans-serif, system-ui, "Segoe UI", Roboto, Arial, sans-serif;
   --canvas: #1c1c21;
   --side-bg: #141418;
@@ -44,6 +45,7 @@
 }
 :root[data-theme="light"] {
   color-scheme: light;
+  --viz-1: #d6246e; --viz-2: #2a78d6; --abc-a: #8f1347; --abc-b: #d6246e; --abc-c: #e98bb0;
   --canvas: #f3f3f6;
   --side-bg: #ffffff;
   --surface: #ffffff;
@@ -240,3 +242,15 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent-soft
 .mini-stat b { font-size: 20px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; line-height: 1.1; }
 .mini-stat b.t-bad { color: var(--bad); }
 .mini-stat span { font-size: 11.5px; color: var(--text-2); }
+
+/* recharts */
+.viz { width: 100%; height: 260px; }
+.viz .recharts-surface:focus, .viz .recharts-wrapper:focus { outline: none; }
+.viz-tip { min-width: 150px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface);
+  box-shadow: var(--shadow-card); font-size: 12px; color: var(--ink); }
+.viz-tip b { display: block; margin-bottom: 4px; font-weight: 600; }
+.viz-tip div { display: flex; align-items: center; gap: 6px; }
+.viz-tip i { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+.viz-tip span { color: var(--text-2); }
+.viz-tip em { margin-left: auto; font-style: normal; font-weight: 600; font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) { .viz { height: 200px; } }

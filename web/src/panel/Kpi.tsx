@@ -1,4 +1,4 @@
-import { useContext, useMemo, useState } from "react";
+import { lazy, Suspense, useContext, useMemo, useState } from "react";
 import { api, download, money, monthISO } from "../api";
 import { LangCtx, useT } from "../i18n";
 import { Ic } from "../icons";
@@ -45,6 +45,7 @@ const T = {
     missing: "без KPI", score: "KPI %" },
 };
 
+const ParetoChart = lazy(() => import("../components/charts").then((m) => ({ default: m.ParetoChart })));
 const fmt = (v: number | null | undefined, d = 1) => (v === null || v === undefined ? "—" : v.toLocaleString("ru-RU", { maximumFractionDigits: d }));
 
 /** Sales agents ranking (Smartup): amount, share, Δ vs previous month, ABC. Unknown = "—". */
@@ -78,37 +79,6 @@ function SalesRank({ month }: { month: string }) {
         </table></div>
       ) : <Empty text={t.l("Bu oy uchun savdo ma'lumoti yo'q", "Нет данных о продажах за месяц", "No sales data for this month")} />}
     </section>
-  );
-}
-
-/** Pareto chart: bars sorted desc (coloured by class) + cumulative line + A/B threshold lines. */
-function Pareto({ abc }: { abc: Abc }) {
-  const W = 1000, H = 230, pl = 36, pr = 40, pb = 18, pt = 10;
-  const n = abc.rows.length;
-  if (!n) return <Empty />;
-  const max = Math.max(...abc.rows.map((r) => r.value));
-  const step = (W - pl - pr) / n;
-  const bx = (i: number) => pl + step * i;
-  const y = (v: number) => pt + (H - pt - pb) * (1 - v / max);
-  const yc = (p: number) => pt + (H - pt - pb) * (1 - p / 100);
-  const line = abc.rows.map((r, i) => `${i ? "L" : "M"}${bx(i) + step / 2},${yc(r.cum_share)}`).join(" ");
-  const fill = { A: "var(--accent)", B: "var(--data-2)", C: "var(--data-mute)" };
-  return (
-    <svg className="combo" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label="Pareto">
-      {[0, 25, 50, 75, 100].map((p) => (
-        <g key={p}><line className="gl" x1={pl} x2={W - pr} y1={yc(p)} y2={yc(p)} /><text x={W - pr + 6} y={yc(p) + 4}>{p}%</text></g>
-      ))}
-      {[abc.settings.abc_a, abc.settings.abc_b].map((p) => (
-        <line key={p} x1={pl} x2={W - pr} y1={yc(p)} y2={yc(p)} stroke="var(--accent)" strokeDasharray="6 4" strokeWidth={1} />
-      ))}
-      {abc.rows.map((r, i) => (
-        <rect key={r.employee_id} x={bx(i) + step * 0.15} width={step * 0.7} y={y(r.value)} height={y(0) - y(r.value)} rx={2}
-          style={{ fill: fill[r.class], fillOpacity: r.class === "A" ? 0.85 : 0.9 }}>
-          <title>{`${r.rank}. ${r.full_name}: ${fmt(r.value)} · ${r.cum_share}% · ${r.class}`}</title></rect>
-      ))}
-      <path d={line} fill="none" stroke="var(--ink)" strokeWidth={2} />
-      {abc.rows.map((r, i) => <circle key={r.employee_id} cx={bx(i) + step / 2} cy={yc(r.cum_share)} r={3} fill="var(--ink)" />)}
-    </svg>
   );
 }
 
@@ -177,11 +147,14 @@ function Dashboard({ month, dept, s }: { month: string; dept: string; s: typeof 
                 {upMetrics.map((m) => <option key={m.id} value={`metric:${m.id}`}>{s.basis}: {m.name}</option>)}
               </select>
             </span></div>
-          {a ? <Pareto abc={a} /> : <Empty />}
+          {a && a.rows.length ? (
+            <Suspense fallback={<div className="viz" />}>
+              <ParetoChart rows={a.rows} a={a.settings.abc_a} b={a.settings.abc_b} valueLabel={s.basis} />
+            </Suspense>) : <Empty />}
           <div className="legend-dots">
-            <span><i style={{ ["--c" as any]: "var(--accent)" }} />A {a ? `· ${a.counts.A}` : ""}</span>
-            <span><i style={{ ["--c" as any]: "var(--data-2)" }} />B {a ? `· ${a.counts.B}` : ""}</span>
-            <span><i style={{ ["--c" as any]: "var(--data-mute)" }} />C {a ? `· ${a.counts.C}` : ""}</span>
+            <span><i style={{ ["--c" as any]: "var(--abc-a)" }} />A {a ? `· ${a.counts.A}` : ""}</span>
+            <span><i style={{ ["--c" as any]: "var(--abc-b)" }} />B {a ? `· ${a.counts.B}` : ""}</span>
+            <span><i style={{ ["--c" as any]: "var(--abc-c)" }} />C {a ? `· ${a.counts.C}` : ""}</span>
           </div>
         </section>
       </div>
