@@ -455,6 +455,8 @@ def tools_for(names: list[str], scope: Scope) -> list[Tool]:
             continue
         if t.needs_payroll and not scope.payroll:
             continue
+        if scope.channel == "group" and n in PRIVATE_ONLY:
+            continue
         if scope.hidden:
             from ..services.visibility import TOOL_CATEGORY
             if TOOL_CATEGORY.get(n) in scope.hidden:
@@ -703,3 +705,103 @@ def _late_rule(ctx: Ctx, enabled: bool, late_count: int = 3, to: str = "owner"):
     ctx.db.commit()
     return {"rule": rule, "already_over_limit": da.over_limit(ctx.db)[:15],
             "panel": "Davomat → «Kechikish qoidasi»"}
+
+
+# ---------------- web-panel access from the bot (private chat only; passwords go straight to Telegram) ----------------
+
+PRIVATE_ONLY = {"panel_access", "panel_invite", "panel_invite_decide", "panel_user_create", "panel_user_update",
+                "panel_role_set"}
+_B = {"type": "boolean"}
+
+
+def _panel_guard(ctx: Ctx) -> None:
+    if not ctx.scope.at_least("hr_head"):  # access to the whole HR panel: checked here, not only by hiding the tool
+        raise PermissionError("hr_head only")
+    if ctx.scope.channel == "group":
+        raise PermissionError("Panel access is managed only in the private chat with the bot")
+
+
+def _pa_call(ctx: Ctx, fn, *a, **kw):
+    from ..services import panel_access as pa
+    _panel_guard(ctx)
+    try:
+        out = fn(ctx.db, ctx.scope, *a, **kw)
+    except pa.AccessError as e:
+        ctx.db.rollback()
+        return {"error": str(e)}
+    ctx.db.commit()
+    return out
+
+
+@tool("panel_access", "Web HR panel access: logins (role, sees salaries, active), Telegram invites waiting for approval "
+      "(status pending = the person opened the link) and roles with their permissions.", min_role="hr_head")
+def _panel_access(ctx: Ctx):
+    from ..models import User
+    from ..rbac import PERMISSIONS
+    from ..services import panel_access as pa
+    _panel_guard(ctx)
+    users = [{k: r[k] for k in ("username", "full_name", "role", "can_see_payroll", "active")}
+             for r in map(pa.user_row, ctx.db.scalars(select(User).order_by(User.username)))]
+    inv = [{k: r[k] for k in ("id", "role", "status", "tg_name", "tg_username", "can_see_payroll")}
+           for r in pa.invites(ctx.db, 30) if r["status"] in ("open", "pending")]
+    ctx.db.commit()
+    return {"users": users, "invites": inv, "roles": pa.roles(ctx.db),
+            "permissions": {k: v["uz"] for k, v in PERMISSIONS.items()}, "everything": "*"}
+
+
+@tool("panel_invite", "Make a one-time 24 h Telegram link that gives a person web-panel access with a role (codes from "
+      "panel_access: ceo, hr_manager, recruiter, payroll, executive, manager or a custom one). Give the link to HR as is. "
+      "When the person opens it, HR is told here and approves with panel_invite_decide; the login then goes to that "
+      "person's own Telegram.", {"role": S, "can_see_payroll": _B}, min_role="hr_head", required=["role"])
+def _panel_invite(ctx: Ctx, role: str, can_see_payroll: bool = False):
+    from ..services import panel_access as pa
+    out = _pa_call(ctx, pa.create_invite, role, bool(can_see_payroll))
+    return out if "error" in out else {"invite_id": out["id"], "role": role, "link": out["link"], "valid_hours": 24}
+
+
+@tool("panel_invite_decide", "Approve or reject a panel invite request (id from panel_access / the notice). Approve "
+      "creates the login and sends login + password to that person's own Telegram; optional `username` sets the login.",
+      {"invite_id": I, "approve": _B, "username": S, "full_name": S}, min_role="hr_head", required=["invite_id", "approve"])
+def _panel_invite_decide(ctx: Ctx, invite_id: int, approve: bool, username: str = "", full_name: str = ""):
+    from ..services import panel_access as pa
+    if not approve:
+        out = _pa_call(ctx, pa.reject_invite, invite_id)
+        return out if "error" in out else {"invite_id": invite_id, "status": "rejected"}
+    out = _pa_call(ctx, pa.approve_invite, invite_id, username or None, full_name or None)
+    return out if "error" in out else {"login": out["username"], "role": out["role"],
+                                       "note": "Login and password were sent to that person's Telegram. Never invent a password."}
+
+
+@tool("panel_user_create", "Create a web-panel login without a Telegram link. A strong password is generated and sent "
+      "ONLY to the private chat of the HR person asking (never shown here); they pass it on. Login: latin letters/digits.",
+      {"username": S, "role": S, "full_name": S, "can_see_payroll": _B}, min_role="hr_head", required=["username", "role"])
+def _panel_user_create(ctx: Ctx, username: str, role: str, full_name: str = "", can_see_payroll: bool = False):
+    from ..services import panel_access as pa
+    out = _pa_call(ctx, pa.create_user, username.strip(), role, full_name, bool(can_see_payroll))
+    return out if "error" in out else {"login": out["username"], "role": out["role"], "can_see_payroll": out["can_see_payroll"],
+                                       "note": "The password was sent to you in a separate message. Never write a password yourself."}
+
+
+@tool("panel_user_update", "Change a panel login: role, sees salaries, turn off/on (active), or reset_password (a new "
+      "one goes to the person's Telegram if linked, otherwise to you privately).",
+      {"username": S, "role": S, "can_see_payroll": _B, "active": _B, "full_name": S, "reset_password": _B},
+      min_role="hr_head", required=["username"])
+def _panel_user_update(ctx: Ctx, username: str, role: str = "", can_see_payroll: bool | None = None,
+                       active: bool | None = None, full_name: str = "", reset_password: bool = False):
+    from ..models import User
+    from ..services import panel_access as pa
+    _panel_guard(ctx)
+    u = ctx.db.scalar(select(User).where(User.username == username.strip()))
+    if not u:
+        return {"error": f"No login '{username}'"}
+    out = _pa_call(ctx, pa.update_user, u, role=role or None, can_see_payroll=can_see_payroll, active=active,
+                   full_name=full_name or None, reset_password=bool(reset_password))
+    return out if "error" in out else {k: out[k] for k in ("username", "role", "can_see_payroll", "active")}
+
+
+@tool("panel_role_set", "Create a panel role or replace what it may see and do. `perms` = permission codes from "
+      "panel_access (e.g. hr.read, payroll.read, recruiting) or ['*'] for everything. The main admin role is fixed.",
+      {"code": S, "perms": {"type": "array", "items": S}, "name": S}, min_role="hr_head", required=["code", "perms"])
+def _panel_role_set(ctx: Ctx, code: str, perms: list[str], name: str = ""):
+    from ..services import panel_access as pa
+    return _pa_call(ctx, pa.set_role, code, list(perms or []), name or None)

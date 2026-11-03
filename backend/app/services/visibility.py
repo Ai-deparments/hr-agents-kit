@@ -75,6 +75,7 @@ def apply(db: Session, scope, tg_id: int, channel: str):
     """Hide the categories this person may not see in this chat (mutates and returns the scope)."""
     hidden = set(CATEGORIES) - allowed(db, scope.role, tg_id, channel)
     scope.hidden = hidden
+    scope.channel = channel
     if "payroll" in hidden:
         scope.payroll = False
     return scope

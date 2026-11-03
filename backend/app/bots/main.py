@@ -970,6 +970,8 @@ def _use_invite(user, token: str) -> bool:
         i.status, i.telegram_id, i.used_at = "pending", user.id, datetime.now()
         i.tg_name = " ".join(x for x in (user.first_name, user.last_name) if x)[:160]
         i.tg_username = user.username
+        from ..services import panel_access
+        panel_access.invite_used_notice(db, i)  # the inviter can approve in words in the bot
         db.commit()
         return True
 
@@ -1061,6 +1063,7 @@ async def send_outbox(sender: Sender) -> None:
                     thread = topics.thread_for(db, o.topic) if o.topic else None
                     await b.send_message(o.telegram_id, _esc(o.text), message_thread_id=thread)
                 ok = True
+                o.text = re.sub(r"(Parol / Пароль: )\S+", r"***", o.text)  # panel passwords don't stay in the DB
             except Exception as e:
                 err = str(e)
             outbox.finish(db, o, ok, err)

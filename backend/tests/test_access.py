@@ -46,7 +46,7 @@ def test_invite_via_telegram(db):
     u = c.post(f"/api/users/pending/{inv['id']}/approve", headers=admin, json={}).json()
     assert u["username"] == "malika_hr" and u["telegram_id"] == 777001 and u["role"] == "hr_manager"
     msg = db.scalar(select(Outbox).where(Outbox.telegram_id == 777001))
-    assert "Login: malika_hr" in msg.text and "Parol:" in msg.text
+    assert "Login: malika_hr" in msg.text and "Parol / Пароль:" in msg.text
     assert c.get("/api/users/pending", headers=_login("hr", "demo12345")).status_code == 403
     me = [x for x in c.get("/api/users", headers=admin).json() if x["username"] == "admin"][0]
     assert me["last_login"] is not None

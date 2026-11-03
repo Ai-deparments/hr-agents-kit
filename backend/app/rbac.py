@@ -78,6 +78,7 @@ class Scope:
     perms: set[str] = field(default_factory=set)
     functions: set[str] | None = None  # bot functions; None = all (owner / HR)
     hidden: set[str] = field(default_factory=set)  # data categories hidden in this chat (services/visibility.py)
+    channel: str = ""  # bot chat: "private" | "group" ("" = panel / tests)
 
     def has_function(self, agent: str) -> bool:
         return self.functions is None or AGENT_FUNCTION.get(agent, agent) in self.functions

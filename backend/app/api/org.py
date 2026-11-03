@@ -15,6 +15,7 @@ from ..models import Branch, Department, Employee, Outbox, Position, Region, Reg
 from ..config import cfg, settings
 from ..models import PanelInvite
 from ..rbac import BOT_FUNCTIONS, PERMISSIONS, Scope, audit
+from ..services import panel_access as pa
 
 router = APIRouter(prefix="/api")
 ADMIN = require("*")  # main admin (and CEO): roles, users, departments
@@ -141,14 +142,22 @@ class UserPatch(BaseModel):
     password: str | None = Field(default=None, min_length=10)
 
 
-def _user_row(u: User) -> dict:
-    return {"id": u.id, "username": u.username, "full_name": u.full_name, "role": u.role, "branch_scope": u.branch_scope,
-            "can_see_payroll": u.can_see_payroll, "active": u.active, "telegram_id": u.telegram_id, "last_login": u.last_login}
+_user_row = pa.user_row
 
 
 def _role_exists(db: Session, code: str) -> None:
     if not db.scalar(select(Role.id).where(Role.code == code)):
         raise HTTPException(400, "Unknown role")
+
+
+def _pa(fn, *a, **kw):
+    """Run a panel_access call; its AccessError becomes a 400/404/409 for the panel."""
+    try:
+        return fn(*a, **kw)
+    except pa.AccessError as e:
+        msg = str(e)
+        raise HTTPException(409 if "taken" in msg or "cannot" in msg else 404 if "Nothing" in msg or "not found" in msg
+                            else 400, msg)
 
 
 @router.get("/users")
@@ -494,37 +503,19 @@ class InviteIn(BaseModel):
     can_see_payroll: bool = False
 
 
-def _invite_row(i: PanelInvite) -> dict:
-    return {"id": i.id, "role": i.role, "status": i.status, "tg_name": i.tg_name, "tg_username": i.tg_username,
-            "telegram_id": i.telegram_id, "created_by": i.created_by, "created_at": i.created_at, "used_at": i.used_at,
-            "expires_at": i.expires_at, "can_see_payroll": i.can_see_payroll, "branch_scope": i.branch_scope}
+_invite_row = pa.invite_row
 
 
 @router.post("/users/invite")
 def user_invite(body: InviteIn, scope: Scope = Depends(ADMIN), db: Session = Depends(get_db)):
-    import secrets as _s
-    from datetime import timedelta
-    _role_exists(db, body.role)
-    bot = (cfg("company.recruiter_bot") or "").lstrip("@")
-    if not bot:
-        raise HTTPException(400, "Bot username is not configured (company.recruiter_bot)")
-    i = PanelInvite(token=_s.token_urlsafe(18), role=body.role, branch_scope=body.branch_scope, can_see_payroll=body.can_see_payroll,
-                    created_by=scope.actor, expires_at=datetime.now() + timedelta(hours=24))
-    db.add(i)
-    db.flush()
-    audit(db, scope, "user_invite", f"invite:{i.id}", role=body.role)
+    out = _pa(pa.create_invite, db, scope, body.role, body.can_see_payroll, body.branch_scope)
     db.commit()
-    return {**_invite_row(i), "link": f"https://t.me/{bot}?start=join_{i.token}"}
+    return out
 
 
 @router.get("/users/pending")
 def users_pending(scope: Scope = Depends(ADMIN), db: Session = Depends(get_db)):
-    now_ = datetime.now()
-    out = []
-    for i in db.scalars(select(PanelInvite).order_by(PanelInvite.id.desc()).limit(200)):
-        if i.status == "open" and i.expires_at < now_:
-            i.status = "expired"
-        out.append(_invite_row(i))
+    out = pa.invites(db)
     db.commit()
     return out
 
@@ -536,35 +527,14 @@ class ApproveUserIn(BaseModel):
 
 @router.post("/users/pending/{iid}/approve")
 def users_pending_approve(iid: int, body: ApproveUserIn, scope: Scope = Depends(ADMIN), db: Session = Depends(get_db)):
-    import re as _re
-    import secrets as _s
-    i = db.get(PanelInvite, iid)
-    if not i or i.status != "pending" or not i.telegram_id:
-        raise HTTPException(404, "Nothing to approve")
-    username = body.username or _re.sub(r"[^a-z0-9_.-]", "", (i.tg_username or f"tg{i.telegram_id}").lower()) or f"tg{i.telegram_id}"
-    if db.scalar(select(User.id).where(User.username == username)):
-        raise HTTPException(409, "Username taken — set another one")
-    password = _s.token_urlsafe(9)
-    u = User(username=username, full_name=body.full_name or i.tg_name or username, password_hash=hash_password(password),
-             role=i.role, branch_scope=i.branch_scope, can_see_payroll=i.can_see_payroll, telegram_id=i.telegram_id)
-    db.add(u)
-    db.flush()
-    i.status, i.user_id = "approved", u.id
-    url = (settings().webapp_url or "").rstrip("/")
     # the password goes only to the person's own Telegram chat, never back to the panel
-    _notify(db, i.telegram_id, f"✅ HR-panelga kirish ochildi.\n{url}\nLogin: {username}\nParol: {password}\n"
-                               "Kirgandan keyin parolni almashtiring.")
-    audit(db, scope, "user_invite_approve", f"user:{u.username}", role=u.role)
+    out = _pa(pa.approve_invite, db, scope, iid, body.username, body.full_name)
     db.commit()
-    return _user_row(u)
+    return out
 
 
 @router.post("/users/pending/{iid}/reject")
 def users_pending_reject(iid: int, scope: Scope = Depends(ADMIN), db: Session = Depends(get_db)):
-    i = db.get(PanelInvite, iid)
-    if not i or i.status not in ("open", "pending"):
-        raise HTTPException(404, "Not found")
-    i.status = "rejected"
-    audit(db, scope, "user_invite_reject", f"invite:{i.id}")
+    out = _pa(pa.reject_invite, db, scope, iid)
     db.commit()
-    return _invite_row(i)
+    return out
