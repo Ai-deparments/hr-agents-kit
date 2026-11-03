@@ -181,6 +181,14 @@ def confirm(db: Session, scope: Scope, run_id: str, change_id: str = "") -> dict
     return {"applied": True, "employee": f"#{e.id} {e.full_name}", "done": done}
 
 
+def cancel(db: Session, scope: Scope, run_id: str) -> dict:
+    s = db.get(Setting, f"pending_edit:{scope.actor}")
+    if s:
+        db.delete(s)
+        db.commit()
+    return {"cancelled": bool(s)}
+
+
 def pay_for(db: Session, scope: Scope, who: str, month: str | None = None) -> dict:
     e = find_employee(db, scope, who)
     month = month or date.today().strftime("%Y-%m")

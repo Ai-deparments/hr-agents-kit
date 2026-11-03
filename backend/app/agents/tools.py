@@ -861,3 +861,9 @@ def _employee_pay(ctx: Ctx, employee: str, month: str = ""):
         return ae.pay_for(ctx.db, ctx.scope, employee, month or None)
     except ae.EditError as e:
         return {"error": str(e)}
+
+
+@tool("cancel_change", "Drop the change shown before when the person says no (yo'q / нет / kerak emas).", min_role="hr_head")
+def _cancel_change(ctx: Ctx):
+    from ..services import agent_edits as ae
+    return _edit(ctx, ae.cancel)

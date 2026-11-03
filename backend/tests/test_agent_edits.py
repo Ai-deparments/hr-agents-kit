@@ -76,3 +76,10 @@ def test_rights(db):
     assert "error" in run(db, "employee_change", {"employee": f"#{e.id}", "base_salary": 1}, scope=no_pay)
     recruiter_panel = Scope("user:rec", "hr_head", None, False, None, {"recruiting"})  # panel recruiter mapped to hr_head
     assert "error" in run(db, "employee_change", {"employee": f"#{e.id}", "phone": "+998900000000"}, scope=recruiter_panel)
+
+
+def test_cancel_drops_pending(db):
+    e = _probation(db) or db.scalars(select(Employee).where(Employee.status != "fired")).first()
+    run(db, "employee_change", {"employee": f"#{e.id}", "phone": "+998901112233"})
+    assert run(db, "cancel_change", {})["cancelled"] is True
+    assert "error" in run(db, "confirm_change", {})
