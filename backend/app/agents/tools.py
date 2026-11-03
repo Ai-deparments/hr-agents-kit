@@ -867,3 +867,124 @@ def _employee_pay(ctx: Ctx, employee: str, month: str = ""):
 def _cancel_change(ctx: Ctx):
     from ..services import agent_edits as ae
     return _edit(ctx, ae.cancel)
+
+
+# ---------------- KPI in words: metrics (create / change) and monthly values ----------------
+
+def _kpi_ok(ctx: Ctx) -> bool:
+    if ctx.scope.perms:  # panel user: role rights, same as the KPI page
+        return ctx.scope.can("analytics") or ctx.scope.can("payroll.write")
+    return ctx.scope.at_least("hr_head")
+
+
+def _kpi_named(ctx: Ctx, model, attr: str, text: str, label: str):
+    from ..services import agent_edits as ae
+    return ae._pick(ctx.db, model, attr, text, label)
+
+
+@tool("kpi_metrics", "KPI metrics (indicators) with target, unit, direction (up = more is better, down = less), weight "
+      "and who they apply to (position / department, empty = everyone).", min_role="hr_head")
+def _kpi_metrics(ctx: Ctx):
+    from ..models import Department, KpiMetric, Position
+    out = []
+    for m in ctx.db.scalars(select(KpiMetric).order_by(KpiMetric.active.desc(), KpiMetric.id)):
+        out.append({"id": m.id, "name": m.name, "target": m.target, "unit": m.unit, "direction": m.direction,
+                    "weight": m.weight, "active": m.active,
+                    "position": ctx.db.get(Position, m.position_id).title if m.position_id else "hamma",
+                    "department": ctx.db.get(Department, m.department_id).name if m.department_id else "hamma"})
+    return {"metrics": out, "panel": "KPI va BI-tahlil -> KPI ko'rsatkichlari"}
+
+
+@tool("kpi_metric_save", "Create a KPI metric, or change one (pass metric_id). target > 0; direction up (more is better, "
+      "e.g. sales plan) or down (less is better, e.g. late days); weight 1-100; position / department by name limits "
+      "who it applies to (empty = everyone; 'hamma' clears). active=false switches it off. Say what was saved.",
+      {"name": S, "target": {"type": "number"}, "unit": S, "direction": {**S, "enum": ["up", "down"]}, "weight": I,
+       "position": S, "department": S, "metric_id": I, "active": {"type": "boolean"}}, min_role="hr_head")
+def _kpi_metric_save(ctx: Ctx, name: str = "", target: float | None = None, unit: str | None = None,
+                     direction: str | None = None, weight: int | None = None, position: str | None = None,
+                     department: str | None = None, metric_id: int | None = None, active: bool | None = None):
+    from ..models import Department, KpiMetric, Position
+    from ..services import agent_edits as ae
+    if not _kpi_ok(ctx):
+        return {"error": "KPI ko'rsatkichlarini o'zgartirishga ruxsat yo'q"}
+    m = ctx.db.get(KpiMetric, metric_id) if metric_id else None
+    if metric_id and not m:
+        return {"error": f"KPI #{metric_id} topilmadi"}
+    if m is None:
+        if len((name or "").strip()) < 2 or not target or target <= 0:
+            return {"error": "Yangi KPI uchun nomi va maqsad (target > 0) kerak"}
+        m = KpiMetric(name=name.strip()[:120], target=float(target), unit=(unit or "")[:20], direction=direction or "up",
+                      weight=int(weight or 1))
+        ctx.db.add(m)
+    else:
+        if name:
+            m.name = name.strip()[:120]
+        if target is not None:
+            if target <= 0:
+                return {"error": "Maqsad 0 dan katta bo'lishi kerak"}
+            m.target = float(target)
+        if unit is not None:
+            m.unit = unit[:20]
+        if direction:
+            m.direction = direction
+        if weight is not None:
+            m.weight = int(weight)
+        if active is not None:
+            m.active = bool(active)
+    if m.direction not in ("up", "down") or not 1 <= m.weight <= 100:
+        ctx.db.rollback()
+        return {"error": "direction: up/down, weight: 1-100"}
+    try:
+        for val, attr, model, field_, label in ((position, "position_id", Position, "title", "Lavozim"),
+                                                (department, "department_id", Department, "name", "Bo'lim")):
+            if val is None:
+                continue
+            setattr(m, attr, None if val.strip().lower() in ("", "hamma", "все", "all") else
+                    _kpi_named(ctx, model, field_, val, label).id)
+    except ae.EditError as e:
+        ctx.db.rollback()
+        return {"error": str(e)}
+    ctx.db.flush()
+    audit(ctx.db, ctx.scope, "kpi_metric_create" if not metric_id else "kpi_metric_update", f"kpi:{m.id}",
+          name=m.name, goal=m.target, weight=m.weight, via="agent")
+    ctx.db.commit()
+    return {"saved": True, "id": m.id, "name": m.name, "target": m.target, "unit": m.unit, "direction": m.direction,
+            "weight": m.weight, "active": m.active}
+
+
+@tool("kpi_value_set", "Enter one employee's KPI value for a month (default this month): employee = name or #id, "
+      "metric = KPI name or id, value = the fact (e.g. 92 for 92% plan). value null clears it. Not for closed months.",
+      {"employee": S, "metric": S, "value": {"type": "number"}, "month": {**S, "description": "YYYY-MM"}},
+      min_role="hr_head", required=["employee", "metric"])
+def _kpi_value_set(ctx: Ctx, employee: str, metric: str, value: float | None = None, month: str = ""):
+    from ..models import KpiMetric, KpiValue
+    from ..services import agent_edits as ae, kpi as kpi_s
+    if not _kpi_ok(ctx):
+        return {"error": "KPI kiritishga ruxsat yo'q"}
+    month = month or date.today().strftime("%Y-%m")
+    if payroll.is_locked(ctx.db, month):
+        return {"error": f"{month} oyi yopilgan — KPI o'zgarmaydi"}
+    try:
+        e = ae.find_employee(ctx.db, ctx.scope, employee)
+        mid = metric.strip().lstrip("#")
+        m = ctx.db.get(KpiMetric, int(mid)) if mid.isdigit() else _kpi_named(ctx, KpiMetric, "name", metric, "KPI")
+    except ae.EditError as err:
+        return {"error": str(err)}
+    if not m or not m.active:
+        return {"error": "KPI topilmadi yoki o'chirilgan"}
+    if not kpi_s.applies(m, e):
+        return {"error": f"«{m.name}» bu xodimning lavozimi/bo'limiga tegishli emas"}
+    if value is not None and not 0 <= value <= 1e12:
+        return {"error": "Qiymat noto'g'ri"}
+    row = ctx.db.scalar(select(KpiValue).where(KpiValue.employee_id == e.id, KpiValue.metric_id == m.id, KpiValue.month == month))
+    if value is None:
+        if row:
+            ctx.db.delete(row)
+    elif row:
+        row.value, row.author = float(value), ctx.scope.actor
+    else:
+        ctx.db.add(KpiValue(employee_id=e.id, metric_id=m.id, month=month, value=float(value), author=ctx.scope.actor))
+    payroll.mark_changed(ctx.db, month)
+    audit(ctx.db, ctx.scope, "kpi_values", month, changed=1, employee=e.id, metric=m.id, via="agent")
+    ctx.db.commit()
+    return {"saved": True, "employee": e.full_name, "metric": m.name, "month": month, "value": value, "target": m.target}

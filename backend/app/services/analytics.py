@@ -102,7 +102,8 @@ def overview(db: Session, scope: Scope, today: date | None = None) -> dict:
     rows = [{"branch": k, "people": v["people"], "fund": v["fund"] if scope.payroll else None,
              "avg_salary": round(v["fund"] / v["people"]) if scope.payroll and v["people"] else None}
             for k, v in sorted(by_branch.items())]
-    return {"date": today.isoformat(), "active": len(active), "fund": fund,
+    salaried = sum(1 for e in active if e.base_salary) if scope.payroll else None
+    return {"date": today.isoformat(), "active": len(active), "fund": fund, "salaried": salaried,
             "on_shift_today": day["came"], "scheduled_today": day["scheduled"], "late_today": day["late"],
             "unmarked_today": day["unmarked"], "pending_requests": pending, "new_candidates": new_cands,
             "attendance_source": cfg("attendance.source", "telegram"), "branches": rows}

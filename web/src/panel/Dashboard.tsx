@@ -5,11 +5,12 @@ import { Ic } from "../icons";
 import { AnimatedValue } from "../components/AnimatedValue";
 import { Empty, Err, useLoad } from "../ui";
 import AgentBox from "./AgentBox";
+import TileExplain from "./TileExplain";
 import { can, usePanel } from "./ctx";
 
 type Day = { day: string; came: number; scheduled: number; late: number };
 type D = {
-  date: string; active: number; fund: number | null; on_shift_today: number; scheduled_today: number; late_today: number;
+  date: string; active: number; fund: number | null; salaried: number | null; on_shift_today: number; scheduled_today: number; late_today: number;
   unmarked_today: number; pending_requests: number; new_candidates: number; pending_approvals: number; documents_30d: number;
   registrations_pending: number | null;
   headcount: { total: number; probation: number };
@@ -39,11 +40,14 @@ const L = {
     nCand: "канд.", days: "дн." },
 };
 
-function Kpi({ label, value, unit, chip, delta, cmp, icon, hero }: {
+function Kpi({ label, value, unit, chip, delta, cmp, icon, hero, onOpen }: {
   label: string; value: string | number; unit?: string; chip?: string; delta?: string; cmp?: string; icon: string; hero?: boolean;
+  onOpen?: () => void;
 }) {
   return (
-    <div className={`span-3 card kpi${hero ? " kpi-hero" : ""}`}>
+    <div className={`span-3 card kpi${hero ? " kpi-hero" : ""}${onOpen ? " kpi-click" : ""}`} onClick={onOpen}
+      role={onOpen ? "button" : undefined} tabIndex={onOpen ? 0 : undefined} title={onOpen ? "Qayerdan olinadi?" : undefined}
+      onKeyDown={(e) => { if (onOpen && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onOpen(); } }}>
       <span className="kpi-ghost"><Ic n={icon} size={48} /></span>
       <span className="kpi-l">{label}</span>
       <span className="kpi-v"><AnimatedValue value={value} />{unit && <span className="u">{unit}</span>}</span>
@@ -87,6 +91,7 @@ export default function Dashboard() {
   const s = lang === "uz" ? L.uz : L.ru;
   const { me, go } = usePanel();
   const { data: d, error } = useLoad<D>("/api/dashboard");
+  const [tile, setTile] = useState<string | null>(null);
   const audit = useLoad<Audit[]>(can(me, "audit.read") ? "/api/audit?limit=6" : null);
   if (error) return <Err e={error} />;
   if (!d) return <div className="empty">…</div>;
@@ -105,17 +110,18 @@ export default function Dashboard() {
     <>
       <div className="grid">
         <Kpi icon="team" label={s.active} value={d.active} chip={`${d.headcount.probation} ${s.probation}`}
-          delta={pct(d.headcount.probation, d.active)} cmp={`${d.turnover.left} ${s.left}`} />
+          delta={pct(d.headcount.probation, d.active)} cmp={`${d.turnover.left} ${s.left}`} onOpen={() => setTile("active")} />
         <Kpi icon="clock" label={s.shift} value={`${d.on_shift_today} / ${d.scheduled_today}`} chip={`${d.unmarked_today} ${s.notMarked}`}
-          delta={pct(d.on_shift_today, d.scheduled_today)} cmp={`${d.late_today} ${s.late.toLowerCase()}`} />
+          delta={pct(d.on_shift_today, d.scheduled_today)} cmp={`${d.late_today} ${s.late.toLowerCase()}`} onOpen={() => setTile("shift")} />
         <Kpi icon="wallet" label={s.fund} value={mln(d.fund)} unit={s.mln} chip={s.base}
-          delta={d.fund !== null && d.active ? `${mln(Math.round(d.fund / d.active))} ${s.mln}` : undefined}
-          cmp={lang === "uz" ? "o'rtacha oylik" : "средний оклад"} />
+          delta={d.fund !== null && d.salaried ? `${mln(Math.round(d.fund / d.salaried))} ${s.mln}` : undefined}
+          cmp={lang === "uz" ? "o'rtacha oylik" : "средний оклад"} onOpen={() => setTile("fund")} />
         <Kpi hero icon="inbox" label={s.regs} value={d.registrations_pending ?? "—"} chip={`${d.new_candidates} ${s.cand}`}
-          delta={`${d.pending_requests}`} cmp={s.req} />
+          delta={`${d.pending_requests}`} cmp={s.req} onOpen={() => setTile("inbox")} />
       </div>
 
       <AgentBox lang={lang} />
+      {tile && <TileExplain tile={tile} onClose={() => setTile(null)} />}
 
       <section className="card">
         <div className="card-h"><span className="card-t">{s.att}</span><span className="card-s">{s.att14}</span>

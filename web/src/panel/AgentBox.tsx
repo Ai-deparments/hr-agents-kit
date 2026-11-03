@@ -33,8 +33,8 @@ function Md({ text }: { text: string }) {
 }
 
 const HINTS = {
-  uz: ["Bugun kim kech qoldi?", "Sinov muddatini olib tashla: ", "Shu oy oyligini hisobla: "],
-  ru: ["Кто сегодня опоздал?", "Убери испытательный срок у ", "Посчитай зарплату за месяц: "],
+  uz: ["Bugun kim kech qoldi?", "Sinov muddatini olib tashla: ", "Shu oy oyligini hisobla: ", "Yangi KPI qo'sh: "],
+  ru: ["Кто сегодня опоздал?", "Убери испытательный срок у ", "Посчитай зарплату за месяц: ", "Создай KPI: "],
 };
 
 /** HR agent chat on the dashboard: same agent and tools as the Telegram bot. */

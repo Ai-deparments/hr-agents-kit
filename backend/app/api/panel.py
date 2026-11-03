@@ -115,6 +115,16 @@ def dashboard(scope: Scope = Depends(require("hr.read")), db: Session = Depends(
     return o
 
 
+@router.get("/dashboard/explain/{tile}")
+def dashboard_explain(tile: str, scope: Scope = Depends(require("hr.read")), db: Session = Depends(get_db)):
+    """Click on a dashboard tile: formula, source systems and the rows behind the number."""
+    from ..services import dash_explain
+    fn = dash_explain.TILES.get(tile)
+    if not fn:
+        raise HTTPException(404, "Unknown tile")
+    return fn(db, scope)
+
+
 @router.get("/badges")
 def badges(scope: Scope = Depends(panel_scope), db: Session = Depends(get_db)):
     """Header counters: things waiting for a person."""

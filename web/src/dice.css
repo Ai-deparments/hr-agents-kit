@@ -270,3 +270,21 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent-soft
 .ab-form input { flex: 1; height: 38px; }
 .ab-form .btn { width: 42px; height: 38px; padding: 0; display: grid; place-items: center; }
 .ab-hints { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* clickable dashboard tiles + "where does this number come from" */
+.kpi-click { cursor: pointer; transition: border-color .15s, transform .15s; }
+.kpi-click:hover { border-color: var(--accent); }
+.kpi-click:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tx { display: flex; flex-direction: column; gap: 14px; min-width: min(640px, 86vw); }
+.tx-value { font-size: 30px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.tx-sec p { margin: 4px 0 0; color: var(--text-2); font-size: 13px; line-height: 1.5; }
+.tx-src { margin: 6px 0 0; padding-left: 18px; font-size: 13px; color: var(--text-2); display: grid; gap: 3px; }
+.tx-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.tx-g { border: 1px solid var(--grid); border-radius: 8px; padding: 10px; }
+.tx-gt { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: 6px; }
+.tx-gi { display: grid; grid-template-columns: minmax(0, 1fr) 70px 40px; gap: 8px; align-items: center; font-size: 12.5px; padding: 3px 0; }
+.tx-gi .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tx-gi .bar { height: 6px; border-radius: 3px; background: var(--grid); overflow: hidden; }
+.tx-gi .bar i { display: block; height: 100%; background: var(--accent); }
+.tx-gi b { text-align: right; font-variant-numeric: tabular-nums; }
+.tx-rows { max-height: 300px; overflow-y: auto; margin-top: 6px; }
